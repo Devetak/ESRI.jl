@@ -1,0 +1,23 @@
+name = "ESRI"
+uuid = "44b9fa8a-7b67-4022-aaef-71217a010daf"
+version = "0.1.0"
+authors = ["Devetak <m888itja@gmail.com>"]
+license = "MIT"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+JuliaFormatter = "98e50ef6-434e-11e9-1051-2b60c6c9e899"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
+ProgressBars = "49802e3a-d2f1-5c88-81d8-b72133a6f568"
+SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+Julia = "1.11"
+LinearAlgebra = "1.11"
+SparseArrays = "1.11"
+Test = "1.11"

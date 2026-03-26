@@ -1,9 +1,11 @@
 """
-    compute_esri(weight_matrix, info::IndustryInfo; maxiter=100, tol=1e-2, verbose=false, threads=false)
+    compute_esri(weight_matrix, info::IndustryInfo; maxiter=100, tol=1e-2, verbose=false, threads=false, firm_indices=nothing)
 
 Compute ESRI (Economic Systemic Risk Index) for each firm.
 
 If `threads=true`, the outer firm loop is parallelized with `Threads.@threads`. Each worker allocates its own work buffers to avoid races; dense linear algebra inside may still use BLAS threads depending on your Julia/BLAS configuration.
+
+If `firm_indices` is provided, only those firms are computed (other entries in the returned vector remain `0`).
 """
 function compute_esri(
     weight_matrix,

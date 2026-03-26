@@ -1,78 +1,82 @@
 # ESRI.jl
 
-Efficient computation of the Economic Systemic Risk Index (ESRI) for large production networks. ESRI.jl is an open-source Julia package that provides a high-level API to compute systemic risk on large, sparse production networks.
-
-At the core of the package is a single high-level API:
-
-- `compute_esri(weight_matrix, info; maxiter=100, tol=1e-2, verbose=false)`  
-  where:
-  - `weight_matrix` is a dense `Matrix` or sparse `SparseMatrixCSC` with supplier weights, and
-  - `info` is an `IndustryInfo` describing industry membership and which industries are considered essential.
-
-`IndustryInfo` encodes, for each firm, an industry identifier and a Boolean flag for whether that industry is essential. `compute_esri` then iteratively propagates shocks through the production network until it converges to an ESRI vector.
+ESRI.jl computes, for each firm, the share of the economy that depends on that firm in `[0, 1]`.
 
 ## Installation
 
-Until ESRI.jl is registered in the General registry, you can install it directly from the Git repository:
+Install from this repository (current work-in-progress):
 
 ```julia
 using Pkg
 Pkg.add(url = "https://github.com/Devetak/ESRI.jl")
 ```
 
-Once registered, you will be able to install it with:
+After registration in the General registry:
 
 ```julia
 using Pkg
 Pkg.add("ESRI")
 ```
 
-To work in a local checkout (recommended for development and benchmarking):
+For local development:
 
 ```julia
 using Pkg
 Pkg.develop(path = "/path/to/ESRI.jl")
 ```
 
-## Quick start
+## Quick start (sparse only)
 
 ```julia
-using ESRI, SparseArrays
+using ESRI
+using SparseArrays
+using LinearAlgebra: I
 
 N = 1_000
-W = sprand(N, N, 0.01) + 0.1I # supplier weights
-types = rand(1:5, N)
-essential = [true, true, true, false, false]
-info = IndustryInfo(types, essential)
+W = sprand(N, N, 0.01) + 0.1I # supplier weights (sparse)
 
-esri = compute_esri(W, info; tol=1e-3, maxiter=50)
+industry_ids = rand(1:5, N)
+essential_industry = [true, true, true, false, false] # length = number of industries
+info = IndustryInfo(industry_ids, essential_industry)
+
+esri = compute_esri(W, info; maxiter = 50, tol = 1e-3)
 ```
 
-## Public API overview
+## Performance / execution model
 
-The main public entry points are:
+ESRI is computed by iterating upstream and downstream shock dynamics for each firm, then aggregating an ESRI contribution for that firm. By default it runs serially over firms; you can opt into Julia threading via an API keyword on `compute_esri`.
 
-- `IndustryInfo(industry_ids::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})`  
-  Construct metadata describing industry membership and which industries are essential.
+## Multiprocessing transparency
 
-- `compute_esri(weight_matrix, info; maxiter=100, tol=1e-2, verbose=false)`  
-  Compute the Economic Systemic Risk Index for all firms given a (dense or sparse) supplier weight matrix and an `IndustryInfo` instance.
+`compute_esri` controls parallelism explicitly. If you enable threading, firms are computed independently and written to unique output slots; dense linear algebra inside the method may still use BLAS threads depending on your Julia/BLAS setup.
 
-Internally, the implementation is organized in:
-
-- `src/ESRI.jl`: module entry point and exports,
-- `src/types.jl`: definitions of `IndustryInfo` and related types,
-- `src/esri_computation.jl`: core ESRI iterative computation,
-- `src/downstream.jl`, `src/upstream.jl`, `src/impact.jl`: helpers for directional impacts and aggregation.
-
-## Project setup
-
-Instantiate the project environment:
+## Reproducibility
 
 ```julia
-julia --project -e 'using Pkg; Pkg.instantiate()'
+using Random, ESRI
+using SparseArrays
+using LinearAlgebra: I
+
+Random.seed!(42)
+
+N = 1_000
+W = sprand(N, N, 0.01) + 0.1I
+
+industry_ids = rand(1:5, N)
+essential_industry = [true, true, true, false, false]
+info = IndustryInfo(industry_ids, essential_industry)
+
+esri = compute_esri(W, info; maxiter = 50, tol = 1e-3)
 ```
 
+## Reference paper
+
+Diem, C. et al. *Quantifying firm-level economic systemic risk from nation-wide supply networks* (Scientific Reports, 2022): https://www.nature.com/articles/s41598-022-11522-z
+
+## Public API
+
+- `IndustryInfo(industry_ids::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})`
+- `compute_esri(weight_matrix, info; maxiter = 100, tol = 1e-2, verbose = false, kwargs...)`
 
 ## License
 

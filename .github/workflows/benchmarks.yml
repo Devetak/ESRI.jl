@@ -1,0 +1,35 @@
+name: Benchmarks (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: "Number of firms"
+        required: false
+        default: "5000"
+      avg-degree:
+        description: "Average outgoing edges per firm (approx.)"
+        required: false
+        default: "10"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - name: Run benchmark sampling + extrapolation
+        env:
+          JULIA_NUM_THREADS: 1
+        run: |
+          julia --project=. benchmark/benchmarks.jl \
+            --n ${{ inputs.n }} \
+            --avg-degree ${{ inputs.avg-degree }} \
+            --seed 123 \
+            --maxiter 30 \
+            --tol 1e-3 \
+            --rank-by size \
+            --bottom 100 --top 100 --middle 800 --random-count 1000
+

@@ -88,7 +88,7 @@ end
 
 function main()
     # Args (simple parsing; defaults are geared toward local/offline benchmarking)
-    n = 50_000
+    n = 100_000
     avg_degree = 10
     num_industries = 50
     essential_industries = 5

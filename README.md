@@ -46,6 +46,14 @@ esri = compute_esri(W, info; maxiter = 50, tol = 1e-3)
 
 ESRI is computed by iterating upstream and downstream shock dynamics for each firm, then aggregating an ESRI contribution for that firm. By default it runs serially over firms; you can opt into Julia threading via an API keyword on `compute_esri`.
 
+### Runtime example (100,000 firms)
+Using the synthetic power-law benchmark setup in `benchmark/benchmarks.jl` with:
+`--n 100000 --avg-degree 10 --seed 123 --maxiter 10 --tol 1e-2 --rank-by size --threads false --bottom 50 --top 50 --middle 200 --random-count 100`,
+the measured/extrapolated single-thread runtime was:
+- extrapolated full-network runtime: `t_full_est = 58.3` minutes
+
+Since `threads=true` parallelizes the outer “per firm” loop, the expected runtime with 10 threads is roughly `58.3 / 10 = 5.8` minutes (assuming close to linear scaling).
+
 ## Multiprocessing transparency
 
 `compute_esri` controls parallelism explicitly. If you enable threading, firms are computed independently and written to unique output slots; dense linear algebra inside the method may still use BLAS threads depending on your Julia/BLAS setup.

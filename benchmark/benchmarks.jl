@@ -4,7 +4,8 @@ using SparseArrays
 using LinearAlgebra: I
 using Printf
 using DelimitedFiles
-using Statistics: mean
+using Statistics: mean, median
+using Pkg
 
 using ESRI
 
@@ -86,23 +87,150 @@ function elapsed_once(f)::Float64
     return t
 end
 
+function elapsed_once_with_result(f)
+    timed = @timed f()
+    # Julia may return either a NamedTuple (newer) or tuple-like structure.
+    # Normalize to (time, value).
+    if timed isa NamedTuple
+        return timed.time, timed.value
+    end
+    return timed[2], timed[1]
+end
+
+const _ECONRISK_MODULE = Ref{Any}(nothing)
+
+function get_econrisk_module()
+    if _ECONRISK_MODULE[] !== nothing
+        return _ECONRISK_MODULE[]
+    end
+    econ_dir = joinpath(@__DIR__, "..", "Economic-Systemic-Risk")
+    @info "Activating Economic-Systemic-Risk env" econ_dir
+    orig_proj = Base.active_project()
+    Pkg.activate(econ_dir)
+    Pkg.instantiate()
+
+    mod = Module(:EconomicSystemicRiskBench)
+    Base.include(mod, joinpath(econ_dir, "extern.jl"))
+    Base.include(mod, joinpath(econ_dir, "functions.jl"))
+
+    _ECONRISK_MODULE[] = mod
+    if orig_proj !== nothing
+        Pkg.activate(orig_proj)
+    end
+    return mod
+end
+
+function build_econrisk_market(
+    econ_mod,
+    W,
+    industry_ids::AbstractVector{<:Integer},
+    essential_industry::AbstractVector{Bool},
+)
+    n = size(W, 1)
+    @assert size(W, 2) == n
+
+    row_sums = vec(sum(W, dims = 2))
+    col_sums = vec(sum(W, dims = 1))
+
+    # Economic-Systemic-Risk code is loaded dynamically via `include`, so under Julia 1.12
+    # we must use `invokelatest` to avoid world-age issues when calling newly-defined methods.
+    market_ctor = Base.invokelatest(getproperty, econ_mod, :Market)
+    company_ctor = Base.invokelatest(getproperty, econ_mod, :Company)
+    edge_ctor = Base.invokelatest(getproperty, econ_mod, :Edge)
+
+    M = Base.invokelatest(market_ctor)
+
+    # Create companies with pre-filled baseline outputs/inputs.
+    @inbounds for i in 1:n
+        M.Companies[i] = Base.invokelatest(
+            company_ctor,
+            string(i),
+            i,
+            Int(industry_ids[i]),
+            edge_ctor[],
+            edge_ctor[],
+            Float64(row_sums[i]),
+            Float64(col_sums[i]),
+        )
+    end
+
+    I, J, V = findnz(W)
+    @inbounds for k in eachindex(V)
+        supplier = I[k]
+        customer = J[k]
+        suppliernace = Int(industry_ids[supplier])
+        customernace = Int(industry_ids[customer])
+        edge_type = essential_industry[suppliernace] ? 2 : 1
+
+        e = Base.invokelatest(
+            edge_ctor,
+            supplier,
+            customer,
+            suppliernace,
+            customernace,
+            Float64(V[k]),
+            edge_type,
+        )
+
+        push!(M.Companies[supplier].customers, e)
+        push!(M.Companies[customer].suppliers, e)
+        push!(M.Edges, e)
+    end
+
+    return M
+end
+
+function psi_mat_all_firms(n::Int)
+    # Each scenario shocks exactly one firm with shocksize=1 (so ESRI uses psi = 1 - 1 = 0).
+    return spdiagm(0 => ones(Float64, n))
+end
+
+function psi_mat_one_firm(n::Int, firm_idx::Int)
+    return sparse([firm_idx], [1], [1.0], n, 1)
+end
+
+function _econrisk_extract_columns(df)
+    # Run through `invokelatest` from caller to avoid world-age issues with DataFrames methods.
+    return df[!, :index], df[!, :esri]
+end
+
+function extract_econrisk_esri_vector(econ_mod, df, n::Int)
+    idxs, vals = Base.invokelatest(_econrisk_extract_columns, df)
+    out = Vector{Float64}(undef, n)
+    @inbounds for k in eachindex(vals)
+        out[idxs[k]] = Float64(vals[k])
+    end
+    return out
+end
+
+function diff_metrics(src::AbstractVector{<:Real}, other::AbstractVector{<:Real})
+    @assert length(src) == length(other)
+    abs_diff = abs.(src .- other)
+    return (
+        max_abs_diff = maximum(abs_diff),
+        mean_abs_diff = mean(abs_diff),
+        median_abs_diff = median(abs_diff),
+    )
+end
+
 function main()
-    # Args (simple parsing; defaults are geared toward local/offline benchmarking)
-    n = 100_000
+    # Transparent default benchmark:
+    # - single-thread only
+    # - full ESRI (shock every firm once)
+    # - compare this repo vs Economic-Systemic-Risk
+    # - report timing + max/mean/median absolute output differences
+    n = 10_000
     avg_degree = 10
     num_industries = 50
     essential_industries = 5
     seed = 123
     maxiter = 50
-    tol = 1e-3
+    # External implementation converges using a fixed error threshold of 1e-2.
+    tol = 1e-2
     pilot_maxiter = 8
     pilot_tol = 1e-1
-    threads = false
-    rank_by = "size" # "size" (fast) or "esri" (slow pilot ranking)
-    bottom = 100
-    top = 100
-    middle = 800
-    random_count = 1000
+    threads = false # fixed by request: single thread
+    out_name = ""
 
     for (i, a) in enumerate(ARGS)
         if a == "--n"; n = parse(Int, ARGS[i + 1]) end
@@ -110,12 +238,11 @@ function main()
         if a == "--seed"; seed = parse(Int, ARGS[i + 1]) end
         if a == "--maxiter"; maxiter = parse(Int, ARGS[i + 1]) end
         if a == "--tol"; tol = parse(Float64, ARGS[i + 1]) end
-        if a == "--threads"; threads = parse(Bool, ARGS[i + 1]) end
-        if a == "--rank-by"; rank_by = ARGS[i + 1] end
-        if a == "--bottom"; bottom = parse(Int, ARGS[i + 1]) end
-        if a == "--top"; top = parse(Int, ARGS[i + 1]) end
-        if a == "--middle"; middle = parse(Int, ARGS[i + 1]) end
-        if a == "--random-count"; random_count = parse(Int, ARGS[i + 1]) end
+        if a == "--output"; out_name = ARGS[i + 1] end
+    end
+
+    if Threads.nthreads() != 1
+        error("This benchmark is configured for single-thread execution. Run with JULIA_NUM_THREADS=1.")
     end
 
     Random.seed!(seed)
@@ -123,75 +250,79 @@ function main()
     essential_industry = falses(num_industries)
     essential_industry[1:essential_industries] .= true
 
-    @info "Generating power-law network" n avg_degree seed
-    W, firm_sizes = make_powerlaw_sparse_weights(n; avg_degree = avg_degree, seed = seed)
-
-    industry_ids = rand(1:num_industries, n)
-    info = IndustryInfo(industry_ids, essential_industry)
-
-    # Rank firms for stratified sampling.
-    # - Default (`rank_by=\"size\"`): fast proxy based on the synthetic firm sizes used to generate the network.
-    # - Optional (`rank_by=\"esri\"`): slow pilot `compute_esri` run on all firms (may be infeasible for very large n).
-    if rank_by == "esri"
-        @info "Pilot ESRI run for firm ranking" pilot_maxiter pilot_tol
-        esri_scores = compute_esri(W, info; maxiter = pilot_maxiter, tol = pilot_tol, verbose = false, threads = threads)
-    else
-        esri_scores = firm_sizes
-    end
-
-    strat_idx = select_stratified_indices(esri_scores; bottom = bottom, top = top, middle = middle)
-    strat_size = bottom + top + middle
-    @assert length(strat_idx) == strat_size
-
-    # Sample 1000 additional random firms disjoint from stratified set.
-    rng = MersenneTwister(seed + 1)
-    in_strat = falses(n)
-    in_strat[strat_idx] .= true
-    in_sample = copy(in_strat)
-    random_idx = Vector{Int}(undef, 0)
-    while length(random_idx) < random_count
-        cand = rand(rng, 1:n)
-        if !in_sample[cand]
-            push!(random_idx, cand)
-            in_sample[cand] = true
-        end
-    end
-
-    sample_idx = vcat(strat_idx, random_idx)
-    @assert length(sample_idx) == strat_size + random_count
-
-    base_idx = sample_idx[1:1]
-
-    @info "Timing" m=length(sample_idx) n=n
-    # Measure time for m=1 and m=2000 to extrapolate full-network runtime.
-    @info "Warm-up runs (compilation/JIT)" warmup_m1=true warmup_m=length(sample_idx)
-    compute_esri(W, info; firm_indices = base_idx, maxiter = maxiter, tol = tol, verbose = false, threads = threads)
-    compute_esri(W, info; firm_indices = sample_idx, maxiter = maxiter, tol = tol, verbose = false, threads = threads)
-
-    t_base = elapsed_once(() -> compute_esri(W, info; firm_indices = base_idx, maxiter = maxiter, tol = tol, verbose = false, threads = threads))
-    t_m = elapsed_once(() -> compute_esri(W, info; firm_indices = sample_idx, maxiter = maxiter, tol = tol, verbose = false, threads = threads))
-
-    m = length(sample_idx)
-    # Linear model: t(m) ~= t(1) + (m-1)*c  => c = (t_m - t_base)/(m-1)
-    c = (t_m - t_base) / (m - 1)
-    t_full_est = t_base + c * (n - 1)
-    if t_full_est < 0
-        @warn "Negative extrapolated runtime; likely measurement noise. Clamping to 0." t_full_est
-        t_full_est = 0.0
-    end
+    # Load external implementation once (activation + instantiate is expensive).
+    econ_mod = get_econrisk_module()
 
     results_dir = joinpath(@__DIR__, "..", "results")
     isdir(results_dir) || mkpath(results_dir)
-    out_path = joinpath(results_dir, @sprintf("esri_bench_n%d_deg%d_seed%d.csv", n, avg_degree, seed))
+    default_out = @sprintf("esri_single_thread_n%d_seed%d_avgdeg%d.csv", n, seed, avg_degree)
+    out_path = joinpath(results_dir, isempty(out_name) ? default_out : out_name)
+
+    @info "Running transparent benchmark" n avg_degree seed maxiter tol threads
+    @info "Generating power-law network" n avg_degree seed
+    W, _ = make_powerlaw_sparse_weights(n; avg_degree = avg_degree, seed = seed)
+
+    industry_ids = rand(1:num_industries, n)
+    info = IndustryInfo(industry_ids, essential_industry)
+    econ = ESRIEconomy(W, info)
+
+    # Warm-up for JIT only (single firm).
+    _ = esri(econ; firm_indices = [1], maxiter = pilot_maxiter, tol = pilot_tol, verbose = false, threads = threads)
+
+    @info "Computing full ESRI (src)" n maxiter tol threads
+    t_src_s, src_esri = elapsed_once_with_result(() -> esri(econ; maxiter = maxiter, tol = tol, verbose = false, threads = threads))
+
+    M = build_econrisk_market(econ_mod, W, industry_ids, essential_industry)
+    build_arrays = Base.invokelatest(getproperty, econ_mod, :buildArrays)
+    esri_fn = Base.invokelatest(getproperty, econ_mod, :ESRI)
+    A = Base.invokelatest(build_arrays, M)
+
+    psi_warm = psi_mat_one_firm(n, 1)
+    _ = Base.invokelatest(
+        esri_fn,
+        M,
+        A,
+        psi_warm,
+        Dict("tmax" => min(pilot_maxiter, maxiter), "timeseries" => false),
+    )
+
+    @info "Computing full ESRI (Economic-Systemic-Risk)" n maxiter
+    t_econrisk_s, econ_esri = elapsed_once_with_result(() -> begin
+        psi_all = psi_mat_all_firms(n)
+        df = Base.invokelatest(
+            esri_fn,
+            M,
+            A,
+            psi_all,
+            Dict("tmax" => maxiter, "timeseries" => false),
+        )
+        return extract_econrisk_esri_vector(econ_mod, df, n)
+    end)
+
+    metrics = diff_metrics(src_esri, econ_esri)
 
     open(out_path, "w") do io
-        println(io, "n,avg_degree,num_industries,essential_industries,maxiter,tol,threads,seed,rank_by,m,t_base_s,t_m_s,c_s_per_firm,t_full_est_s")
-        @printf(io, "%d,%d,%d,%d,%d,%g,%s,%d,%s,%d,%.6f,%.6f,%.6e,%.6f\n",
-            n, avg_degree, num_industries, essential_industries, maxiter, tol, string(threads),
-            seed, rank_by, m, t_base, t_m, c, t_full_est)
+        println(io, "n,threads,avg_degree,num_industries,essential_industries,maxiter,tol,seed,t_src_s,t_econrisk_s,max_abs_diff,mean_abs_diff,median_abs_diff")
+        @printf(
+            io,
+            "%d,%s,%d,%d,%d,%d,%g,%d,%.6f,%.6f,%.6e,%.6e,%.6e\n",
+            n,
+            string(threads),
+            avg_degree,
+            num_industries,
+            essential_industries,
+            maxiter,
+            tol,
+            seed,
+            t_src_s,
+            t_econrisk_s,
+            metrics.max_abs_diff,
+            metrics.mean_abs_diff,
+            metrics.median_abs_diff,
+        )
     end
 
-    @info "Benchmark complete" out_path t_base=t_base t_m=t_m t_full_est=t_full_est
+    @info "Benchmark complete" out_path
 end
 
 main()

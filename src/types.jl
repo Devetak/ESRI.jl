@@ -4,6 +4,22 @@ struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
     essential_firm::TB
 end
 
+struct ESRIEconomy{T,TU,TD}
+    info::IndustryInfo
+    upstream_impact::TU
+    downstream_impact::TD
+    column_sums::Vector{T}
+    row_sums::Vector{T}
+    total_output::T
+    n::Int
+end
+
+struct ESRIResult{T}
+    esri::T
+    upstream::Vector{T}
+    downstream::Vector{T}
+end
+
 function IndustryInfo(
     industry_of_firm::AbstractVector{Int},
     essential_industry::AbstractVector{Bool},
@@ -19,7 +35,34 @@ function IndustryInfo(
     return IndustryInfo(industry_of_firm, essential_industry, essential_firm)
 end
 
+function ESRIEconomy(weight_matrix::AbstractMatrix{T}, info::IndustryInfo) where {T<:Real}
+    n = length(info)
+    @assert size(weight_matrix, 1) == n && size(weight_matrix, 2) == n "weight_matrix must be square and match info size"
+
+    upstream_impact = create_upstream_impact_matrix(weight_matrix)
+    downstream_impact = if weight_matrix isa SparseMatrixCSC{T}
+        compute_downstream_impact_matrix_csr(weight_matrix, info)
+    else
+        compute_downstream_impact_matrix(weight_matrix, info)
+    end
+
+    column_sums = vec(sum(weight_matrix, dims = 1))
+    row_sums = vec(sum(weight_matrix, dims = 2))
+    total_output = sum(column_sums)
+
+    return ESRIEconomy(
+        info,
+        upstream_impact,
+        downstream_impact,
+        column_sums,
+        row_sums,
+        total_output,
+        n,
+    )
+end
+
 Base.length(info::IndustryInfo) = length(info.industry_of_firm)
+Base.length(econ::ESRIEconomy) = econ.n
 
 num_industries(info::IndustryInfo) = length(info.essential_industry)
 

@@ -1,6 +1,6 @@
 function compute_sigmas!(
     sigmas::AbstractVector,
-    column_sums::AbstractVector,
+    row_sums::AbstractVector,
     downstream_vector::AbstractVector,
     info::IndustryInfo,
     temp_sums::AbstractVector,
@@ -13,7 +13,7 @@ function compute_sigmas!(
     fill!(temp_sums, zeroT)
     @inbounds for firm_idx in eachindex(sigmas)
         industry = industry_map[firm_idx]
-        temp_sums[industry] += column_sums[firm_idx] * downstream_vector[firm_idx]
+        temp_sums[industry] += row_sums[firm_idx] * downstream_vector[firm_idx]
     end
     @inbounds for firm_idx in eachindex(sigmas)
         industry = industry_map[firm_idx]
@@ -21,7 +21,7 @@ function compute_sigmas!(
         if denom == 0
             sigmas[firm_idx] = oneT
         else
-            sigmas[firm_idx] = min(column_sums[firm_idx] / denom, oneT)
+            sigmas[firm_idx] = min(row_sums[firm_idx] / denom, oneT)
         end
     end
     return sigmas
@@ -41,10 +41,7 @@ function compute_product_matrix!(
 
     fill!(product_matrix, oneT)
 
-    # Ensure one_minus_downstream buffer is correct size and computed
-    if length(one_minus_downstream) != length(downstream_vector)
-        resize!(one_minus_downstream, length(downstream_vector))
-    end
+    @assert length(one_minus_downstream) == length(downstream_vector) "one_minus_downstream length must match downstream_vector"
     @inbounds for i in eachindex(downstream_vector)
         one_minus_downstream[i] = oneT - downstream_vector[i]
     end
@@ -80,10 +77,7 @@ function compute_product_matrix!(
 
     fill!(product_matrix, oneT)
 
-    # Ensure one_minus_downstream buffer is correct size and computed
-    if length(one_minus_downstream) != length(downstream_vector)
-        resize!(one_minus_downstream, length(downstream_vector))
-    end
+    @assert length(one_minus_downstream) == length(downstream_vector) "one_minus_downstream length must match downstream_vector"
     @inbounds for i in eachindex(downstream_vector)
         one_minus_downstream[i] = oneT - downstream_vector[i]
     end
@@ -121,10 +115,7 @@ function compute_product_matrix!(
 
     fill!(product_matrix, oneT)
 
-    # Ensure one_minus_downstream buffer is correct size and computed
-    if length(one_minus_downstream) != length(downstream_vector)
-        resize!(one_minus_downstream, length(downstream_vector))
-    end
+    @assert length(one_minus_downstream) == length(downstream_vector) "one_minus_downstream length must match downstream_vector"
     @inbounds for i in eachindex(downstream_vector)
         one_minus_downstream[i] = oneT - downstream_vector[i]
     end
@@ -177,7 +168,7 @@ end
 function downstream_shock!(
     impact_matrix,
     info::IndustryInfo,
-    column_sums::AbstractVector,
+    row_sums::AbstractVector,
     firm_idx::Integer,
     sigmas::AbstractVector,
     product_matrix::AbstractMatrix,
@@ -208,17 +199,12 @@ function downstream_shock!(
     for iter = 1:maxiter
         compute_sigmas!(
             sigmas,
-            column_sums,
+            row_sums,
             current_downstream,
             info,
             temp_sums,
             industry_map,
         )
-
-        # Precompute one_minus_downstream before calling compute_product_matrix!
-        @inbounds for i in eachindex(current_downstream)
-            one_minus_downstream[i] = oneT - current_downstream[i]
-        end
 
         compute_product_matrix!(
             product_matrix,

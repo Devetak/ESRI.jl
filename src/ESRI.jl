@@ -11,6 +11,6 @@ include("upstream.jl")
 include("downstream.jl")
 include("esri_computation.jl")
 
-export IndustryInfo, compute_esri
+export IndustryInfo, ESRIEconomy, ESRIResult, esri, compute_esri
 
 end

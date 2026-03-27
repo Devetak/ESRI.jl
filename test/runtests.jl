@@ -163,3 +163,52 @@ end
     @test all(0 .<= esri_serial .<= 1 .+ 1e-6)
 end
 
+@testset "ESRIEconomy + esri API" begin
+    Random.seed!(404)
+    N = 18
+    W = sprand(N, N, 0.12) + 0.1I
+    industry_ids = rand(1:4, N)
+    essential_industry = [true, false, true, false]
+    info = IndustryInfo(industry_ids, essential_industry)
+
+    econ = ESRIEconomy(W, info)
+    @test length(econ) == N
+    @test econ.n == N
+    @test size(econ.upstream_impact) == (N, N)
+    @test length(econ.column_sums) == N
+    @test length(econ.row_sums) == N
+
+    esri_old = compute_esri(W, info; maxiter = 25, tol = 1e-3, verbose = false, threads = false)
+    esri_new = esri(econ; maxiter = 25, tol = 1e-3, verbose = false, threads = false)
+    @test esri_new ≈ esri_old atol = 1e-10 rtol = 1e-10
+
+    subset = [2, 7, 11]
+    esri_subset = esri(econ; maxiter = 25, tol = 1e-3, verbose = false, threads = false, firm_indices = subset)
+    @test all(esri_subset[setdiff(1:N, subset)] .== 0)
+    @test esri_subset[subset] == esri_new[subset]
+
+    i = 7
+    single_val = esri(econ, i; maxiter = 25, tol = 1e-3, verbose = false)
+    @test single_val ≈ esri_new[i] atol = 1e-10 rtol = 1e-10
+
+    single_details = esri(econ, i; maxiter = 25, tol = 1e-3, verbose = false, details = true)
+    @test single_details isa ESRIResult
+    @test single_details.esri ≈ esri_new[i] atol = 1e-10 rtol = 1e-10
+    @test length(single_details.upstream) == N
+    @test length(single_details.downstream) == N
+    @test all(0 .<= single_details.upstream .<= 1 .+ 1e-8)
+    @test all(0 .<= single_details.downstream .<= 1 .+ 1e-8)
+
+    only_upstream = esri(econ, i; maxiter = 25, tol = 1e-3, components = :upstream)
+    only_downstream = esri(econ, i; maxiter = 25, tol = 1e-3, components = :downstream)
+    @test haskey(only_upstream, :upstream)
+    @test !haskey(only_upstream, :downstream)
+    @test haskey(only_downstream, :downstream)
+    @test !haskey(only_downstream, :upstream)
+
+    # Reuse prepared economy across multiple single-firm calls.
+    picks = [1, 5, 9, 13]
+    vals = [esri(econ, idx; maxiter = 25, tol = 1e-3, verbose = false) for idx in picks]
+    @test vals ≈ esri_new[picks] atol = 1e-10 rtol = 1e-10
+end
+

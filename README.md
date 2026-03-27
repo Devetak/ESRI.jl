@@ -39,12 +39,26 @@ industry_ids = rand(1:5, N)
 essential_industry = [true, true, true, false, false] # length = number of industries
 info = IndustryInfo(industry_ids, essential_industry)
 
-esri = compute_esri(W, info; maxiter = 50, tol = 1e-3)
+econ = ESRIEconomy(W, info)  # precompute reusable economy state
+
+# ESRI for all firms
+esri_all = esri(econ; maxiter = 50, tol = 1e-3, threads = true)
+
+# ESRI for one firm
+i = 10
+esri_i = esri(econ, i; maxiter = 50, tol = 1e-3)
+
+# Retrieve vectors too (upstream + downstream)
+details_i = esri(econ, i; maxiter = 50, tol = 1e-3, details = true)
+# details_i.esri, details_i.upstream, details_i.downstream
+
+# Convenience wrapper still available
+esri_wrapper = compute_esri(W, info; maxiter = 50, tol = 1e-3)
 ```
 
 ## Performance / execution model
 
-ESRI is computed by iterating upstream and downstream shock dynamics for each firm, then aggregating an ESRI contribution for that firm. By default it runs serially over firms; you can opt into Julia threading via an API keyword on `compute_esri`.
+ESRI is computed by iterating upstream and downstream shock dynamics for each firm, then aggregating an ESRI contribution for that firm. By default it runs serially over firms; you can opt into Julia threading via `threads=true` on `esri(econ; ...)` (or `compute_esri` wrapper).
 
 ### Runtime example (100,000 firms)
 Using the synthetic power-law benchmark setup in `benchmark/benchmarks.jl` with:
@@ -56,7 +70,7 @@ Since `threads=true` parallelizes the outer “per firm” loop, the expected ru
 
 ## Multiprocessing transparency
 
-`compute_esri` controls parallelism explicitly. If you enable threading, firms are computed independently and written to unique output slots; dense linear algebra inside the method may still use BLAS threads depending on your Julia/BLAS setup.
+`esri(econ; ...)` (and the `compute_esri` wrapper) control parallelism explicitly. If you enable threading, firms are computed independently and written to unique output slots; dense linear algebra inside the method may still use BLAS threads depending on your Julia/BLAS setup.
 
 ## Reproducibility
 
@@ -74,7 +88,8 @@ industry_ids = rand(1:5, N)
 essential_industry = [true, true, true, false, false]
 info = IndustryInfo(industry_ids, essential_industry)
 
-esri = compute_esri(W, info; maxiter = 50, tol = 1e-3)
+econ = ESRIEconomy(W, info)
+esri_all = esri(econ; maxiter = 50, tol = 1e-3)
 ```
 
 ## Reference paper
@@ -84,6 +99,9 @@ Diem, C. et al. *Quantifying firm-level economic systemic risk from nation-wide 
 ## Public API
 
 - `IndustryInfo(industry_ids::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})`
+- `ESRIEconomy(weight_matrix, info::IndustryInfo)`
+- `esri(econ::ESRIEconomy; maxiter = 100, tol = 1e-2, verbose = false, threads = false, firm_indices = nothing)`
+- `esri(econ::ESRIEconomy, firm_idx::Integer; maxiter = 100, tol = 1e-2, verbose = false, details = false, components = :none)`
 - `compute_esri(weight_matrix, info; maxiter = 100, tol = 1e-2, verbose = false, kwargs...)`
 
 ## License

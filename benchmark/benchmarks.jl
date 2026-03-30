@@ -107,7 +107,15 @@ function get_econrisk_module()
     @info "Activating Economic-Systemic-Risk env" econ_dir
     orig_proj = Base.active_project()
     Pkg.activate(econ_dir)
-    Pkg.instantiate()
+    try
+        Pkg.instantiate()
+    catch err
+        # Some branches update Project.toml without a matching Manifest.
+        # Resolve once, then instantiate again to make benchmark runs reproducible.
+        @warn "Economic-Systemic-Risk instantiate failed; retrying after resolve" exception = (err, catch_backtrace())
+        Pkg.resolve()
+        Pkg.instantiate()
+    end
 
     mod = Module(:EconomicSystemicRiskBench)
     Base.include(mod, joinpath(econ_dir, "extern.jl"))
@@ -118,6 +126,30 @@ function get_econrisk_module()
         Pkg.activate(orig_proj)
     end
     return mod
+end
+
+function econrisk_esri_with_mode(
+    econ_mod,
+    esri_fn,
+    M,
+    A,
+    n::Int,
+    maxiter::Int,
+)
+    # Newer Economic-Systemic-Risk branches expose ESRI(M, A, psi_mat, ParsedARGS),
+    # while older ones expose ESRI(M, A). Support both for branch-to-branch comparability.
+    psi_all = psi_mat_all_firms(n)
+    parsed = Dict("tmax" => maxiter, "timeseries" => false)
+    try
+        df = Base.invokelatest(esri_fn, M, A, psi_all, parsed)
+        return extract_econrisk_esri_vector(econ_mod, df, n), "psi_args"
+    catch err
+        if !(err isa MethodError)
+            rethrow(err)
+        end
+        vec = Base.invokelatest(esri_fn, M, A)
+        return Vector{Float64}(vec), "legacy_no_psi_args"
+    end
 end
 
 function build_econrisk_market(
@@ -224,9 +256,9 @@ function main()
     num_industries = 50
     essential_industries = 5
     seed = 123
-    maxiter = 50
+    maxiter = 100
     # External implementation converges using a fixed error threshold of 1e-2.
-    tol = 1e-2
+    tol = 0.01
     pilot_maxiter = 8
     pilot_tol = 1e-1
     threads = false # fixed by request: single thread
@@ -277,27 +309,19 @@ function main()
     esri_fn = Base.invokelatest(getproperty, econ_mod, :ESRI)
     A = Base.invokelatest(build_arrays, M)
 
-    psi_warm = psi_mat_one_firm(n, 1)
-    _ = Base.invokelatest(
-        esri_fn,
-        M,
-        A,
-        psi_warm,
-        Dict("tmax" => min(pilot_maxiter, maxiter), "timeseries" => false),
-    )
+    # Warm-up for JIT only, using a small pilot market (avoid a second full 10k run).
+    pilot_n = min(200, n)
+    pilot_W, _ = make_powerlaw_sparse_weights(pilot_n; avg_degree = avg_degree, seed = seed + 1)
+    pilot_rng = MersenneTwister(seed + 2)
+    pilot_industry_ids = rand(pilot_rng, 1:num_industries, pilot_n)
+    pilot_info = IndustryInfo(pilot_industry_ids, essential_industry)
+    pilot_M = build_econrisk_market(econ_mod, pilot_W, pilot_industry_ids, essential_industry)
+    pilot_A = Base.invokelatest(build_arrays, pilot_M)
+    _, econ_mode = econrisk_esri_with_mode(econ_mod, esri_fn, pilot_M, pilot_A, pilot_n, min(pilot_maxiter, maxiter))
+    @info "Economic-Systemic-Risk API mode" econ_mode
 
-    @info "Computing full ESRI (Economic-Systemic-Risk)" n maxiter
-    t_econrisk_s, econ_esri = elapsed_once_with_result(() -> begin
-        psi_all = psi_mat_all_firms(n)
-        df = Base.invokelatest(
-            esri_fn,
-            M,
-            A,
-            psi_all,
-            Dict("tmax" => maxiter, "timeseries" => false),
-        )
-        return extract_econrisk_esri_vector(econ_mod, df, n)
-    end)
+    @info "Computing full ESRI (Economic-Systemic-Risk)" n maxiter econ_mode
+    t_econrisk_s, econ_esri = elapsed_once_with_result(() -> first(econrisk_esri_with_mode(econ_mod, esri_fn, M, A, n, maxiter)))
 
     metrics = diff_metrics(src_esri, econ_esri)
 

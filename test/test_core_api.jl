@@ -174,3 +174,30 @@ end
     @test_throws DomainError esri(econ, 1; shock = [1.2, 0.3])
     @test_throws DimensionMismatch ESRIEconomy(ones(2, 3), info)
 end
+
+@testset "numeric validation for shock, weights, and matrix entries" begin
+    W = [1.0 0.1; 0.0 1.0]
+    info = IndustryInfo([1, 1], [true])
+    econ = ESRIEconomy(W, info)
+
+    # shock vector must be finite and in [0, 1]
+    @test_throws DomainError esri(econ, 1; shock = [NaN, 1.0])
+    @test_throws DomainError esri(econ, 1; shock = [Inf, 1.0])
+    @test_throws DomainError esri_shock(econ, [1.0, NaN])
+    @test_throws DomainError compute_esri_shock(W, info, [1.0, Inf])
+
+    # final weights must be finite and nonnegative
+    @test_throws DomainError esri(econ; final_weights = [NaN, 1.0])
+    @test_throws DomainError esri(econ; final_weights = [Inf, 1.0])
+    @test_throws DomainError esri(econ; final_weights = [-0.1, 1.0])
+    @test_throws DomainError esri(econ, 1; final_weights = [1.0, -0.2])
+
+    # matrix entries must be finite and nonnegative
+    @test_throws DomainError ESRIEconomy([1.0 NaN; 0.0 1.0], info)
+    @test_throws DomainError ESRIEconomy([1.0 -0.1; 0.0 1.0], info)
+
+    W_sp_inf = sparse([1, 2], [1, 2], [1.0, Inf], 2, 2)
+    W_sp_neg = sparse([1, 2], [1, 2], [1.0, -0.2], 2, 2)
+    @test_throws DomainError ESRIEconomy(W_sp_inf, info)
+    @test_throws DomainError ESRIEconomy(W_sp_neg, info)
+end

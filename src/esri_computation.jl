@@ -44,11 +44,11 @@ function _coerce_weights(
     weights = Vector{T}(undef, n)
     zeroT = zero(T)
     @inbounds for i in eachindex(weights)
-        v = T(final_weights[i])
-        if !isfinite(v) || v < zeroT
+        raw = final_weights[i]
+        if !isfinite(raw) || raw < zeroT
             throw(DomainError(final_weights[i], "final_weights values must be finite and nonnegative"))
         end
-        weights[i] = v
+        weights[i] = T(raw)
     end
     return weights
 end
@@ -59,11 +59,11 @@ function _coerce_shock(shock::AbstractVector{<:Real}, n::Int, ::Type{T}) where {
     oneT = one(T)
     zeroT = zero(T)
     @inbounds for i in eachindex(out)
-        v = T(shock[i])
-        if !isfinite(v) || v < zeroT || v > oneT
+        raw = shock[i]
+        if !isfinite(raw) || raw < zeroT || raw > oneT
             throw(DomainError(shock[i], "shock values must be in [0, 1]"))
         end
-        out[i] = v
+        out[i] = T(raw)
     end
     return out
 end

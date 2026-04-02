@@ -201,3 +201,23 @@ end
     @test_throws DomainError ESRIEconomy(W_sp_inf, info)
     @test_throws DomainError ESRIEconomy(W_sp_neg, info)
 end
+
+@testset "integer matrix inputs and error-type stability" begin
+    info = IndustryInfo([1, 1], [true])
+
+    # Dense Int input should construct and run without InexactError.
+    W_int_dense = [1 1; 0 2]
+    econ_dense = ESRIEconomy(W_int_dense, info)
+    @test eltype(econ_dense.row_sums) <: AbstractFloat
+    @test isfinite(esri(econ_dense, 1; maxiter = 15, tol = 1e-3))
+
+    # Sparse Int input with fractional normalization should also construct cleanly.
+    W_int_sparse = sparse([1, 1, 2], [1, 2, 2], [1, 1, 1], 2, 2)
+    econ_sparse = ESRIEconomy(W_int_sparse, info)
+    @test eltype(econ_sparse.row_sums) <: AbstractFloat
+    @test all(isfinite, esri(econ_sparse; maxiter = 15, tol = 1e-3, threads = false))
+
+    # Invalid numeric inputs should throw DomainError (not conversion errors).
+    @test_throws DomainError esri(econ_sparse; final_weights = [1.0, NaN])
+    @test_throws DomainError esri(econ_sparse, 1; shock = [NaN, 1.0])
+end

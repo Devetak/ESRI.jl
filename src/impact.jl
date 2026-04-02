@@ -151,10 +151,7 @@ function compute_downstream_impact_matrices(
 
     essential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), essential_vals)
     nonessential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), nonessential_vals)
-
-    I1, J1, V1 = findnz(essential_csc)
-    I2, J2, V2 = findnz(nonessential_csc)
-    return sparsecsr(I1, J1, V1, nrows, ncols), sparsecsr(I2, J2, V2, nrows, ncols)
+    return sparsecsr(essential_csc), sparsecsr(nonessential_csc)
 end
 
 function _validate_weight_matrix_entries(weight_matrix::AbstractMatrix{T}) where {T<:Real}
@@ -177,6 +174,28 @@ function _validate_weight_matrix_entries(weight_matrix::SparseMatrixCSC{T}) wher
     return nothing
 end
 
+function _promote_weight_matrix(weight_matrix::SparseMatrixCSC{T,Ti}) where {T<:Real,Ti<:Integer}
+    TF = float(T)
+    if T === TF
+        return weight_matrix
+    end
+    return SparseMatrixCSC(
+        size(weight_matrix, 1),
+        size(weight_matrix, 2),
+        copy(weight_matrix.colptr),
+        copy(weight_matrix.rowval),
+        TF.(weight_matrix.nzval),
+    )
+end
+
+function _promote_weight_matrix(weight_matrix::AbstractMatrix{T}) where {T<:Real}
+    TF = float(T)
+    if T === TF
+        return weight_matrix
+    end
+    return TF.(weight_matrix)
+end
+
 """
     ESRIEconomy(weight_matrix, info::IndustryInfo)
 
@@ -187,13 +206,14 @@ function ESRIEconomy(weight_matrix::AbstractMatrix{T}, info::IndustryInfo) where
     if size(weight_matrix, 1) != n || size(weight_matrix, 2) != n
         throw(DimensionMismatch("weight_matrix must be square and match info size"))
     end
-    _validate_weight_matrix_entries(weight_matrix)
+    matrix = _promote_weight_matrix(weight_matrix)
+    _validate_weight_matrix_entries(matrix)
 
-    upstream_impact = create_upstream_impact_matrix(weight_matrix)
-    downstream_impact_essential, downstream_impact_nonessential = compute_downstream_impact_matrices(weight_matrix, info)
+    upstream_impact = create_upstream_impact_matrix(matrix)
+    downstream_impact_essential, downstream_impact_nonessential = compute_downstream_impact_matrices(matrix, info)
 
-    column_sums = vec(sum(weight_matrix, dims = 1))
-    row_sums = vec(sum(weight_matrix, dims = 2))
+    column_sums = vec(sum(matrix, dims = 1))
+    row_sums = vec(sum(matrix, dims = 2))
     total_output = sum(column_sums)
 
     return ESRIEconomy(

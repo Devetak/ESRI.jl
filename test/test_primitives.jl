@@ -52,3 +52,15 @@ end
     ESRI.upstream_step!(curr_u_sp, sparse([0.0 0.5; 1.0 0.0]), [0.6, 0.8], [1.0, 0.7], [1.0, 0.0])
     @test curr_u_sp ≈ curr_u atol = 1e-12 rtol = 0
 end
+
+@testset "Integer helper inputs" begin
+    W = [1 1; 0 2]
+    info = IndustryInfo([1, 1], [true])
+
+    upstream = ESRI.create_upstream_impact_matrix(W)
+    essential, nonessential = ESRI.compute_downstream_impact_matrices(W, info)
+
+    @test upstream ≈ [0.5 0.0; 0.5 1.0] atol = 1e-12 rtol = 0
+    @test essential ≈ [1.0 1 / 3; 0.0 2 / 3] atol = 1e-12 rtol = 0
+    @test nonessential ≈ zeros(2, 2) atol = 1e-12 rtol = 0
+end

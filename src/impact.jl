@@ -5,8 +5,9 @@ Build the normalized upstream impact matrix.
 """
 function create_upstream_impact_matrix(weight_matrix::AbstractMatrix{T}) where {T<:Real}
     nrows, ncols = size(weight_matrix)
-    result = zeros(eltype(weight_matrix), nrows, ncols)
-    row_sums = vec(sum(weight_matrix, dims = 2))
+    TF = float(T)
+    result = zeros(TF, nrows, ncols)
+    row_sums = vec(sum(TF.(weight_matrix), dims = 2))
     @inbounds for source = 1:nrows
         denom = row_sums[source]
         if denom == 0
@@ -23,12 +24,13 @@ function create_upstream_impact_matrix(weight_matrix::AbstractMatrix{T}) where {
 end
 
 function create_upstream_impact_matrix(weight_matrix::SparseMatrixCSC{T}) where {T<:Real}
+    TF = float(T)
     nrows, ncols = size(weight_matrix)
     rows = weight_matrix.rowval
     colptr = weight_matrix.colptr
     vals = weight_matrix.nzval
 
-    row_sums = zeros(T, nrows)
+    row_sums = zeros(TF, nrows)
     @inbounds for col = 1:ncols
         for idx = colptr[col]:(colptr[col+1]-1)
             row = rows[idx]
@@ -39,7 +41,7 @@ function create_upstream_impact_matrix(weight_matrix::SparseMatrixCSC{T}) where 
     nnz = length(vals)
     new_rows = Vector{Int}(undef, nnz)
     new_cols = Vector{Int}(undef, nnz)
-    new_vals = Vector{T}(undef, nnz)
+    new_vals = Vector{TF}(undef, nnz)
 
     idx_count = 0
     @inbounds for col = 1:ncols
@@ -68,15 +70,16 @@ function compute_downstream_impact_matrices(
     weight_matrix::AbstractMatrix{T},
     info::IndustryInfo,
 ) where {T<:Real}
+    TF = float(T)
     nrows, ncols = size(weight_matrix)
-    essential = zeros(T, nrows, ncols)
-    nonessential = zeros(T, nrows, ncols)
+    essential = zeros(TF, nrows, ncols)
+    nonessential = zeros(TF, nrows, ncols)
     num_inds = num_industries(info)
-    essential_by_industry = zeros(T, num_inds)
+    essential_by_industry = zeros(TF, num_inds)
 
     @inbounds for col = 1:ncols
-        fill!(essential_by_industry, zero(T))
-        all_suppliers_total = zero(T)
+        fill!(essential_by_industry, zero(TF))
+        all_suppliers_total = zero(TF)
         for idx = 1:nrows
             val = weight_matrix[idx, col]
             if val == 0
@@ -95,9 +98,9 @@ function compute_downstream_impact_matrices(
             end
             if is_essential(info, idx)
                 denom = essential_by_industry[get_industry(info, idx)]
-                essential[idx, col] = denom == 0 ? zero(T) : val / denom
+                essential[idx, col] = denom == 0 ? zero(TF) : val / denom
             else
-                nonessential[idx, col] = all_suppliers_total == 0 ? zero(T) : val / all_suppliers_total
+                nonessential[idx, col] = all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
             end
         end
     end
@@ -109,15 +112,16 @@ function compute_downstream_impact_matrices(
     weight_matrix::SparseMatrixCSC{T},
     info::IndustryInfo,
 ) where {T<:Real}
+    TF = float(T)
     nrows, ncols = size(weight_matrix)
     rows = weight_matrix.rowval
     colptr = weight_matrix.colptr
     vals = weight_matrix.nzval
-    essential_vals = zeros(T, length(vals))
-    nonessential_vals = zeros(T, length(vals))
+    essential_vals = zeros(TF, length(vals))
+    nonessential_vals = zeros(TF, length(vals))
 
     num_inds = num_industries(info)
-    essential_by_industry = zeros(T, num_inds)
+    essential_by_industry = zeros(TF, num_inds)
 
     @inbounds for col = 1:ncols
         start_idx = colptr[col]
@@ -126,8 +130,8 @@ function compute_downstream_impact_matrices(
             continue
         end
 
-        fill!(essential_by_industry, zero(T))
-        all_suppliers_total = zero(T)
+        fill!(essential_by_industry, zero(TF))
+        all_suppliers_total = zero(TF)
         for idx = start_idx:stop_idx
             row = rows[idx]
             val = vals[idx]
@@ -142,9 +146,9 @@ function compute_downstream_impact_matrices(
             val = vals[idx]
             if is_essential(info, row)
                 denom = essential_by_industry[get_industry(info, row)]
-                essential_vals[idx] = denom == 0 ? zero(T) : val / denom
+                essential_vals[idx] = denom == 0 ? zero(TF) : val / denom
             else
-                nonessential_vals[idx] = all_suppliers_total == 0 ? zero(T) : val / all_suppliers_total
+                nonessential_vals[idx] = all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
             end
         end
     end

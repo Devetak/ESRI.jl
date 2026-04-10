@@ -1,49 +1,25 @@
 # Troubleshooting
 
-## `DimensionMismatch` from `ESRIEconomy`
+If `ESRIEconomy(W, info)` throws `DimensionMismatch`, then `W` is not square or its size does not match the number of firms in `info`.
 
-Cause: `weight_matrix` is not square or does not match the number of firms in `IndustryInfo`.
+If `IndustryInfo(industry_of_firm, essential_industry)` throws `ArgumentError`, then `essential_industry` is empty or some firm industry id lies outside `1:length(essential_industry)`.
 
-Fix:
+If `esri(econ, firm_idx; ...)` throws `BoundsError`, then `firm_idx` is out of range. If `esri(econ; firm_indices=...)` throws `BoundsError`, then one entry of `firm_indices` is out of range.
 
-```julia
-size(W, 1) == size(W, 2) == length(info.industry_of_firm)
-```
+If `combine` is invalid, the package accepts only `:min`, `:upstream`, and `:downstream`.
 
-## `ArgumentError` from `IndustryInfo`
+If `components` is invalid, the package accepts only `:none`, `:upstream`, `:downstream`, and `:both`.
 
-Cause: `industry_of_firm` contains values outside `1:length(essential_industry)` or `essential_industry` is empty.
+If `shock` throws `DimensionMismatch`, then its length is not `econ.n`. If `shock` throws `DomainError`, then at least one value is not finite or does not lie in `[0,1]`.
 
-Fix:
+If `final_weights` throws `DimensionMismatch`, then its length is not `econ.n`. If it throws `DomainError`, then at least one value is negative or not finite.
 
-```julia
-minimum(industry_ids) >= 1 && maximum(industry_ids) <= length(essential_industry)
-```
+If an economy-wide run with `firm_indices` returns zeros outside the selected set, this is the intended result shape.
 
-## Invalid `combine` or `components`
+If `esri(econ, firm_idx; shock=psi)` does not match the default single-firm shock for `firm_idx`, this is expected. Once `shock=psi` is supplied, `psi` is the scenario.
 
-Cause: unsupported symbols.
-
-Fix:
-
-- `combine ∈ (:min, :upstream, :downstream)`
-- `components ∈ (:none, :upstream, :downstream, :both)`
-
-## Shock validation failures
-
-Cause: `shock` has wrong length or entries outside `[0,1]`.
-
-Fix:
+If a local docs build fails with missing `Documenter`, instantiate the docs environment first:
 
 ```julia
-length(shock) == econ.n
-all(0 .<= shock .<= 1)
+julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
 ```
-
-## Unexpected zeros in subset runs
-
-When using `firm_indices`, ESRI is computed only for selected firms. Non-selected entries remain zero by design.
-
-## Slow repeated calls
-
-If you call `compute_esri` repeatedly with the same `W` and `info`, prebuild `econ = ESRIEconomy(W, info)` and call `esri(econ, ...)` / `esri_shock(econ, ...)` to avoid repeated preprocessing.

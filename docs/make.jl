@@ -6,6 +6,7 @@ DocMeta.setdocmeta!(ESRI, :DocTestSetup, :(using ESRI, SparseArrays, LinearAlgeb
 makedocs(
     modules = [ESRI],
     sitename = "ESRI.jl",
+    format = Documenter.HTML(edit_link = nothing),
     checkdocs = :exports,
     doctest = true,
     pages = [

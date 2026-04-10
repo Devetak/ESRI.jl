@@ -1,64 +1,75 @@
+"""
+    IndustryInfo(industry_of_firm, essential_industry)
+
+Metadata for industry membership and essentiality flags.
+"""
 struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
     industry_of_firm::TI
     essential_industry::TB
     essential_firm::TB
 end
 
-struct ESRIEconomy{T,TU,TD}
-    info::IndustryInfo
+"""
+    ESRIEconomy
+
+Precomputed model state used by `esri` and `esri_shock`.
+"""
+struct ESRIEconomy{T,I<:IndustryInfo,TU,TD,VT<:AbstractVector{T}}
+    info::I
     upstream_impact::TU
-    downstream_impact::TD
-    column_sums::Vector{T}
-    row_sums::Vector{T}
+    downstream_impact_essential::TD
+    downstream_impact_nonessential::TD
+    column_sums::VT
+    row_sums::VT
     total_output::T
     n::Int
 end
 
+"""
+    ESRIResult
+
+Full single-scenario output with scalar ESRI and upstream/downstream vectors.
+"""
 struct ESRIResult{T}
     esri::T
     upstream::Vector{T}
     downstream::Vector{T}
 end
 
+"""
+    IndustryInfo(industry_of_firm::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})
+
+Build immutable industry metadata used by ESRI computations.
+
+- `industry_of_firm[i]` is the 1-based industry id of firm `i`
+- `essential_industry[k]` marks whether industry `k` is essential
+"""
 function IndustryInfo(
-    industry_of_firm::AbstractVector{Int},
+    industry_of_firm::AbstractVector{<:Integer},
     essential_industry::AbstractVector{Bool},
 )
-    num_firms = length(industry_of_firm)
-    num_industries = length(essential_industry)
-    @assert num_industries > 0 "essential_industry must be non-empty"
-    @assert all(1 .<= industry_of_firm .<= num_industries) "industry indices must be in 1:num_industries"
-    essential_firm = similar(essential_industry, Bool, num_firms)
+    if isempty(essential_industry)
+        throw(ArgumentError("essential_industry must be non-empty"))
+    end
+
+    firm_industry = Vector{Int}(undef, length(industry_of_firm))
+    essential_industry_vec = Vector{Bool}(essential_industry)
+    max_industry = length(essential_industry_vec)
+
     @inbounds for i in eachindex(industry_of_firm)
-        essential_firm[i] = essential_industry[industry_of_firm[i]]
-    end
-    return IndustryInfo(industry_of_firm, essential_industry, essential_firm)
-end
-
-function ESRIEconomy(weight_matrix::AbstractMatrix{T}, info::IndustryInfo) where {T<:Real}
-    n = length(info)
-    @assert size(weight_matrix, 1) == n && size(weight_matrix, 2) == n "weight_matrix must be square and match info size"
-
-    upstream_impact = create_upstream_impact_matrix(weight_matrix)
-    downstream_impact = if weight_matrix isa SparseMatrixCSC{T}
-        compute_downstream_impact_matrix_csr(weight_matrix, info)
-    else
-        compute_downstream_impact_matrix(weight_matrix, info)
+        idx = Int(industry_of_firm[i])
+        if idx < 1 || idx > max_industry
+            throw(ArgumentError("industry_of_firm values must be in 1:length(essential_industry)"))
+        end
+        firm_industry[i] = idx
     end
 
-    column_sums = vec(sum(weight_matrix, dims = 1))
-    row_sums = vec(sum(weight_matrix, dims = 2))
-    total_output = sum(column_sums)
+    essential_firm = Vector{Bool}(undef, length(firm_industry))
+    @inbounds for i in eachindex(firm_industry)
+        essential_firm[i] = essential_industry_vec[firm_industry[i]]
+    end
 
-    return ESRIEconomy(
-        info,
-        upstream_impact,
-        downstream_impact,
-        column_sums,
-        row_sums,
-        total_output,
-        n,
-    )
+    return IndustryInfo(firm_industry, essential_industry_vec, essential_firm)
 end
 
 Base.length(info::IndustryInfo) = length(info.industry_of_firm)

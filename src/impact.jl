@@ -1,7 +1,13 @@
+"""
+    create_upstream_impact_matrix(weight_matrix)
+
+Build the normalized upstream impact matrix.
+"""
 function create_upstream_impact_matrix(weight_matrix::AbstractMatrix{T}) where {T<:Real}
     nrows, ncols = size(weight_matrix)
-    result = zeros(eltype(weight_matrix), nrows, ncols)
-    row_sums = vec(sum(weight_matrix, dims = 2))
+    TF = float(T)
+    result = zeros(TF, nrows, ncols)
+    row_sums = vec(sum(TF.(weight_matrix), dims = 2))
     @inbounds for source = 1:nrows
         denom = row_sums[source]
         if denom == 0
@@ -18,12 +24,13 @@ function create_upstream_impact_matrix(weight_matrix::AbstractMatrix{T}) where {
 end
 
 function create_upstream_impact_matrix(weight_matrix::SparseMatrixCSC{T}) where {T<:Real}
+    TF = float(T)
     nrows, ncols = size(weight_matrix)
     rows = weight_matrix.rowval
     colptr = weight_matrix.colptr
     vals = weight_matrix.nzval
 
-    row_sums = zeros(T, nrows)
+    row_sums = zeros(TF, nrows)
     @inbounds for col = 1:ncols
         for idx = colptr[col]:(colptr[col+1]-1)
             row = rows[idx]
@@ -31,18 +38,16 @@ function create_upstream_impact_matrix(weight_matrix::SparseMatrixCSC{T}) where 
         end
     end
 
-    # Build transposed sparse matrix: result[target, source] = weight[source, target] / row_sums[source]
-    # We need to transpose, so we build a new CSC matrix with swapped dimensions
     nnz = length(vals)
     new_rows = Vector{Int}(undef, nnz)
     new_cols = Vector{Int}(undef, nnz)
-    new_vals = Vector{T}(undef, nnz)
+    new_vals = Vector{TF}(undef, nnz)
 
     idx_count = 0
     @inbounds for col = 1:ncols
         for idx = colptr[col]:(colptr[col+1]-1)
-            source = rows[idx]  # source row in original
-            target = col        # target col in original (becomes row in result)
+            source = rows[idx]
+            target = col
             val = vals[idx]
             denom = row_sums[source]
             if denom != 0
@@ -54,42 +59,35 @@ function create_upstream_impact_matrix(weight_matrix::SparseMatrixCSC{T}) where 
         end
     end
 
-    # Resize arrays if needed
     resize!(new_rows, idx_count)
     resize!(new_cols, idx_count)
     resize!(new_vals, idx_count)
 
-    # Build CSC matrix from COO format (rows, cols, vals)
-    # Result should be ncols x nrows (transposed)
     return sparse(new_rows, new_cols, new_vals, ncols, nrows)
 end
 
-function compute_downstream_impact_matrix(
+function compute_downstream_impact_matrices(
     weight_matrix::AbstractMatrix{T},
     info::IndustryInfo,
 ) where {T<:Real}
+    TF = float(T)
     nrows, ncols = size(weight_matrix)
-    result = zeros(T, nrows, ncols)
-    column_sums = vec(sum(weight_matrix, dims = 1))
+    essential = zeros(TF, nrows, ncols)
+    nonessential = zeros(TF, nrows, ncols)
     num_inds = num_industries(info)
-    partial = zeros(T, num_inds)
+    essential_by_industry = zeros(TF, num_inds)
 
     @inbounds for col = 1:ncols
-        col_sum = column_sums[col]
-        if col_sum == 0
-            continue
-        end
-        fill!(partial, zero(T))
-        col_is_essential = is_essential(info, col)
-        if col_is_essential
-            for idx = 1:nrows
-                val = weight_matrix[idx, col]
-                if val == 0
-                    continue
-                end
-                if is_essential(info, idx)
-                    partial[get_industry(info, idx)] += val
-                end
+        fill!(essential_by_industry, zero(TF))
+        all_suppliers_total = zero(TF)
+        for idx = 1:nrows
+            val = weight_matrix[idx, col]
+            if val == 0
+                continue
+            end
+            all_suppliers_total += val
+            if is_essential(info, idx)
+                essential_by_industry[get_industry(info, idx)] += val
             end
         end
 
@@ -98,79 +96,138 @@ function compute_downstream_impact_matrix(
             if val == 0
                 continue
             end
-            if col_is_essential && is_essential(info, idx)
-                denom = partial[get_industry(info, idx)]
-                result[idx, col] = denom == 0 ? zero(T) : val / denom
+            if is_essential(info, idx)
+                denom = essential_by_industry[get_industry(info, idx)]
+                essential[idx, col] = denom == 0 ? zero(TF) : val / denom
             else
-                result[idx, col] = val / col_sum
+                nonessential[idx, col] = all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
             end
         end
     end
-    return result
+
+    return essential, nonessential
 end
 
-function compute_downstream_impact_matrix(
+function compute_downstream_impact_matrices(
     weight_matrix::SparseMatrixCSC{T},
     info::IndustryInfo,
 ) where {T<:Real}
+    TF = float(T)
     nrows, ncols = size(weight_matrix)
     rows = weight_matrix.rowval
     colptr = weight_matrix.colptr
     vals = weight_matrix.nzval
-    result_vals = similar(vals)
+    essential_vals = zeros(TF, length(vals))
+    nonessential_vals = zeros(TF, length(vals))
 
     num_inds = num_industries(info)
-    partial = zeros(T, num_inds)
+    essential_by_industry = zeros(TF, num_inds)
 
     @inbounds for col = 1:ncols
         start_idx = colptr[col]
-        stop_idx = colptr[col+1] - 1
+        stop_idx = colptr[col + 1] - 1
         if start_idx > stop_idx
             continue
         end
-        col_sum = zero(T)
-        for idx = start_idx:stop_idx
-            col_sum += vals[idx]
-        end
-        if col_sum == 0
-            for idx = start_idx:stop_idx
-                result_vals[idx] = zero(T)
-            end
-            continue
-        end
 
-        col_is_essential = is_essential(info, col)
-        if col_is_essential
-            fill!(partial, zero(T))
-            for idx = start_idx:stop_idx
-                row = rows[idx]
-                if is_essential(info, row)
-                    partial[get_industry(info, row)] += vals[idx]
-                end
+        fill!(essential_by_industry, zero(TF))
+        all_suppliers_total = zero(TF)
+        for idx = start_idx:stop_idx
+            row = rows[idx]
+            val = vals[idx]
+            all_suppliers_total += val
+            if is_essential(info, row)
+                essential_by_industry[get_industry(info, row)] += val
             end
         end
 
         for idx = start_idx:stop_idx
             row = rows[idx]
             val = vals[idx]
-            if col_is_essential && is_essential(info, row)
-                denom = partial[get_industry(info, row)]
-                result_vals[idx] = denom == 0 ? zero(T) : val / denom
+            if is_essential(info, row)
+                denom = essential_by_industry[get_industry(info, row)]
+                essential_vals[idx] = denom == 0 ? zero(TF) : val / denom
             else
-                result_vals[idx] = val / col_sum
+                nonessential_vals[idx] = all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
             end
         end
     end
 
-    return SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), result_vals)
+    essential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), essential_vals)
+    nonessential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), nonessential_vals)
+    return sparsecsr(essential_csc), sparsecsr(nonessential_csc)
 end
 
-function compute_downstream_impact_matrix_csr(
-    weight_matrix::SparseMatrixCSC{T},
-    info::IndustryInfo,
-) where {T<:Real}
-    impact_csc = compute_downstream_impact_matrix(weight_matrix, info)
-    # Convert CSC to COO format for sparsecsr
-    I, J, V = findnz(impact_csc)
-    return sparsecsr(I, J, V, size(impact_csc)...)
+function _validate_weight_matrix_entries(weight_matrix::AbstractMatrix{T}) where {T<:Real}
+    @inbounds for i in eachindex(weight_matrix)
+        v = weight_matrix[i]
+        if !isfinite(v) || v < zero(T)
+            throw(DomainError(v, "weight_matrix entries must be finite and nonnegative"))
+        end
+    end
+    return nothing
+end
+
+function _validate_weight_matrix_entries(weight_matrix::SparseMatrixCSC{T}) where {T<:Real}
+    @inbounds for i in eachindex(weight_matrix.nzval)
+        v = weight_matrix.nzval[i]
+        if !isfinite(v) || v < zero(T)
+            throw(DomainError(v, "weight_matrix entries must be finite and nonnegative"))
+        end
+    end
+    return nothing
+end
+
+function _promote_weight_matrix(weight_matrix::SparseMatrixCSC{T,Ti}) where {T<:Real,Ti<:Integer}
+    TF = float(T)
+    if T === TF
+        return weight_matrix
+    end
+    return SparseMatrixCSC(
+        size(weight_matrix, 1),
+        size(weight_matrix, 2),
+        copy(weight_matrix.colptr),
+        copy(weight_matrix.rowval),
+        TF.(weight_matrix.nzval),
+    )
+end
+
+function _promote_weight_matrix(weight_matrix::AbstractMatrix{T}) where {T<:Real}
+    TF = float(T)
+    if T === TF
+        return weight_matrix
+    end
+    return TF.(weight_matrix)
+end
+
+"""
+    ESRIEconomy(weight_matrix, info::IndustryInfo)
+
+Precompute normalized upstream/downstream impact operators and firm output weights.
+"""
+function ESRIEconomy(weight_matrix::AbstractMatrix{T}, info::IndustryInfo) where {T<:Real}
+    n = length(info)
+    if size(weight_matrix, 1) != n || size(weight_matrix, 2) != n
+        throw(DimensionMismatch("weight_matrix must be square and match info size"))
+    end
+    matrix = _promote_weight_matrix(weight_matrix)
+    _validate_weight_matrix_entries(matrix)
+
+    upstream_impact = create_upstream_impact_matrix(matrix)
+    downstream_impact_essential, downstream_impact_nonessential = compute_downstream_impact_matrices(matrix, info)
+
+    column_sums = vec(sum(matrix, dims = 1))
+    row_sums = vec(sum(matrix, dims = 2))
+    total_output = sum(column_sums)
+
+    return ESRIEconomy(
+        info,
+        upstream_impact,
+        downstream_impact_essential,
+        downstream_impact_nonessential,
+        column_sums,
+        row_sums,
+        total_output,
+        n,
+    )
 end

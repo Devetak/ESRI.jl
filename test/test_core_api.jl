@@ -175,6 +175,78 @@ end
     @test_throws DimensionMismatch ESRIEconomy(ones(2, 3), info)
 end
 
+@testset "single-firm verbose iteration info log" begin
+    W = [
+        1.0 0.2 0.0
+        0.1 1.0 0.3
+        0.0 0.4 1.0
+    ]
+    info = IndustryInfo([1, 1, 2], [true, false])
+    econ = ESRIEconomy(W, info)
+
+    @test_logs (:info, r"joint iteration") begin
+        # tol = 0 disables early stopping because the distance is always >= 0.
+        value = esri(econ, 1; verbose = true, maxiter = 10, tol = 0.0)
+        @test isfinite(value)
+    end
+end
+
+@testset "zero-matrix edge cases" begin
+    W0 = zeros(4, 4)
+    info = IndustryInfo([1, 2, 1, 2], [true, false])
+    econ0 = ESRIEconomy(W0, info)
+
+    @test econ0.total_output == 0.0
+    @test all(econ0.row_sums .== 0.0)
+    @test all(econ0.column_sums .== 0.0)
+
+    # With zero total output and default (row-sum) weights, normalized vector output is all zeros.
+    vals = esri(econ0; maxiter = 20, tol = 1e-6, threads = false)
+    @test vals == zeros(4)
+
+    for i in 1:4
+        d = esri(econ0, i; details = true, maxiter = 20, tol = 1e-6)
+        expected = ones(4)
+        expected[i] = 0.0
+        @test d.esri == 0.0
+        @test d.upstream == expected
+        @test d.downstream == expected
+    end
+
+    # With zero total output, explicit weights are not normalized.
+    # Single-firm default shock should reduce exactly one unit when all weights are 1.
+    @test esri(econ0, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 1.0
+end
+
+@testset "hand-computed two-firm fixed point example" begin
+    # Supplier 1 serves both firms; supplier 2 serves only firm 2.
+    # Both firms are in the same essential industry.
+    W = [
+        1.0 1.0
+        0.0 1.0
+    ]
+    info = IndustryInfo([1, 1], [true])
+    econ = ESRIEconomy(W, info)
+
+    # Shock firm 1 only: psi = [0, 1].
+    details = esri(econ, 1; details = true, maxiter = 100, tol = 1e-12)
+
+    # Hand-derived fixed point:
+    # upstream*   = [0, 1]
+    # downstream* = [0, 0]
+    @test details.upstream ≈ [0.0, 1.0] atol = 1e-12 rtol = 0
+    @test details.downstream[1] ≈ 0.0 atol = 1e-12 rtol = 0
+    @test details.downstream[2] ≈ 0.0 atol = 1e-10 rtol = 0
+
+    # Row-sum weights are [2, 1], total output is 3.
+    # combine = :upstream  => (2*(1-0) + 1*(1-1)) / 3 = 2/3
+    # combine = :downstream => (2*(1-0) + 1*(1-0)) / 3 = 1
+    # combine = :min       => same as downstream here = 1
+    @test esri(econ, 1; combine = :upstream, maxiter = 100, tol = 1e-12) ≈ (2 / 3) atol = 1e-12 rtol = 0
+    @test esri(econ, 1; combine = :downstream, maxiter = 100, tol = 1e-12) ≈ 1.0 atol = 1e-10 rtol = 0
+    @test details.esri ≈ 1.0 atol = 1e-10 rtol = 0
+end
+
 @testset "numeric validation for shock, weights, and matrix entries" begin
     W = [1.0 0.1; 0.0 1.0]
     info = IndustryInfo([1, 1], [true])

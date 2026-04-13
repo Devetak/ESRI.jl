@@ -2,7 +2,17 @@
 
 Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix with entry `W_{ij}` equal to supply from firm `i` to firm `j`. Let `g(i)` be the industry of firm `i`. Let `e_k \in \{0,1\}` be the essentiality flag of industry `k`. In the package input, firm `i` is essential exactly when `e_{g(i)} = 1`.
 
-Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap scenario `\psi \in [0,1]^N`.
+Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap vector `\psi \in [0,1]^N`.
+
+The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, firm `i` can operate at at most a `\psi_i` fraction of its baseline capacity. Thus:
+
+- `\psi_i = 1` means no exogenous shock to firm `i`.
+- `\psi_i = 0` means firm `i` is fully closed.
+- `0 < \psi_i < 1` means firm `i` is partially capacity constrained.
+
+If all entries of `\psi` are `1`, then no firm is exogenously shocked.
+
+The ESRI score of a firm as presented by Diem et al. is the total loss at a steady state where `\psi` is `1` for all indices except the index corresponding to that firm, where it is `0`. The `\psi` formulation allows for more general multi-firm and partial-capacity scenarios.
 
 Define firm output and input totals by
 
@@ -162,10 +172,8 @@ If `\sum_i r_i = 0`, the package returns the unnormalized numerator.
 
 ## Relation to the paper
 
-The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022), but with a narrower input contract. The bundled reference code in `Economic-Systemic-Risk/` classifies edge types from sector-pair data and builds scenarios through `psi_mat`; this package takes firm industry labels, one Boolean essentiality flag per industry, and `\psi \in [0,1]^N`.
+The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022). We allow for general shock scenarios via `\psi`.
 
 ## References
 
 Christian Diem, Andras Borsos, Tobias Reisch, Janos Kertesz, Stefan Thurner. Quantifying firm-level economic systemic risk from nation-wide supply networks. Scientific Reports 12, 6214, 2022. DOI `10.1038/s41598-022-11522-z`.
-
-Supporting information is bundled in `paper/41598_2022_11522_MOESM1_ESM.pdf`.

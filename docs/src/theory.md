@@ -4,6 +4,10 @@ Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix wi
 
 Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap scenario `\psi \in [0,1]^N`.
 
+`\psi` is the shock scenario if all entries are `1` then no firm is shocked. If a firm is dead
+
+The ESRI score of a firm as presented by Diem et al. is the total loss at a steady state where `\psi` is `1` for all indexes except the index corresponding to that firm. The `\psi` formulation allows for more general scenarios.
+
 Define firm output and input totals by
 
 ```math
@@ -162,10 +166,8 @@ If `\sum_i r_i = 0`, the package returns the unnormalized numerator.
 
 ## Relation to the paper
 
-The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022), but with a narrower input contract. The bundled reference code in `Economic-Systemic-Risk/` classifies edge types from sector-pair data and builds scenarios through `psi_mat`; this package takes firm industry labels, one Boolean essentiality flag per industry, and `\psi \in [0,1]^N`.
+The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022). We allow for general shock scenarios via `\psi`.
 
 ## References
 
 Christian Diem, Andras Borsos, Tobias Reisch, Janos Kertesz, Stefan Thurner. Quantifying firm-level economic systemic risk from nation-wide supply networks. Scientific Reports 12, 6214, 2022. DOI `10.1038/s41598-022-11522-z`.
-
-Supporting information is bundled in `paper/41598_2022_11522_MOESM1_ESM.pdf`.

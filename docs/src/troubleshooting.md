@@ -17,9 +17,3 @@ If `final_weights` throws `DimensionMismatch`, then its length is not `econ.n`. 
 If an economy-wide run with `firm_indices` returns zeros outside the selected set, this is the intended result shape.
 
 If `esri(econ, firm_idx; shock=psi)` does not match the default single-firm shock for `firm_idx`, this is expected. Once `shock=psi` is supplied, `psi` is the scenario.
-
-If a local docs build fails with missing `Documenter`, instantiate the docs environment first:
-
-```julia
-julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-```

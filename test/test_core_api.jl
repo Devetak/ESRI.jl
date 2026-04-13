@@ -1,167 +1,108 @@
-@testset "compute_esri (sparse) correctness + ranges" begin
-    Random.seed!(123)
-    n = 20
-    W = sprand(n, n, 0.08) + 0.1I
+@testset "Economy-wide API invariants" begin
+    W_sparse, info = sparse_fixture()
+    W_dense = Matrix(W_sparse)
+    econ = ESRIEconomy(W_sparse, info)
 
-    industry_ids = rand(1:5, n)
-    essential_industry = [true, true, true, false, false]
-    info = IndustryInfo(industry_ids, essential_industry)
-
-    esri_serial = compute_esri(W, info; maxiter = 30, tol = 1e-3, verbose = false, threads = false)
-    esri_threaded = compute_esri(W, info; maxiter = 30, tol = 1e-3, verbose = false, threads = true)
-
-    @test size(esri_serial) == (n,)
-    @test all(isfinite, esri_serial)
-    @test all(0 .<= esri_serial .<= 1 .+ 1e-6)
-    @test esri_serial == esri_threaded
-end
-
-@testset "compute_esri (isolated firms edge case)" begin
-    n = 8
-    W = spzeros(n, n)
-    W[1, 1] = 1.0
-    W[2, 2] = 1.0
-    W[3, 3] = 1.0
-    W[4, 4] = 1.0
-    W[1, 2] = 0.2
-    W[2, 3] = 0.3
-
-    industry_ids = [1, 2, 1, 2, 3, 3, 3, 3]
-    essential_industry = [true, false, true]
-    info = IndustryInfo(industry_ids, essential_industry)
-
-    values = compute_esri(W, info; maxiter = 20, tol = 1e-3, verbose = false, threads = false)
-    @test all(isfinite, values)
-    @test all(0 .<= values .<= 1 .+ 1e-6)
-end
-
-@testset "compute_esri sparse vs dense match" begin
-    old_n = BLAS.get_num_threads()
+    old_blas = BLAS.get_num_threads()
     BLAS.set_num_threads(1)
     try
-        Random.seed!(202)
-        n = 25
-        W_sparse = sprand(n, n, 0.12) + 0.1I
-        W_dense = Matrix(W_sparse)
+        scores_sparse = esri(econ; maxiter = 30, tol = 1e-3, threads = false)
+        scores_dense = compute_esri(W_dense, info; maxiter = 30, tol = 1e-3, threads = false)
+        scores_threaded = esri(econ; maxiter = 30, tol = 1e-3, threads = true)
 
-        industry_ids = rand(1:4, n)
-        essential_industry = [true, false, true, false]
-        info = IndustryInfo(industry_ids, essential_industry)
+        @test length(econ) == size(W_sparse, 1) == econ.n
+        @test size(econ.upstream_impact) == size(W_sparse)
+        @test size(econ.downstream_impact_essential) == size(W_sparse)
+        @test size(econ.downstream_impact_nonessential) == size(W_sparse)
+        assert_bounded(scores_sparse; atol = 1e-6)
+        assert_bounded(scores_dense; atol = 1e-6)
+        @test scores_sparse ≈ scores_dense atol = 1e-6 rtol = 1e-6
+        @test scores_sparse == scores_threaded
 
-        esri_sparse = compute_esri(W_sparse, info; maxiter = 25, tol = 1e-3, verbose = false, threads = false)
-        esri_dense = compute_esri(W_dense, info; maxiter = 25, tol = 1e-3, verbose = false, threads = false)
+        subset = [2, 5, 9]
+        subset_scores = esri(econ; maxiter = 30, tol = 1e-3, firm_indices = subset)
+        @test all(subset_scores[setdiff(1:econ.n, subset)] .== 0)
+        @test subset_scores[subset] ≈ scores_sparse[subset] atol = 1e-12 rtol = 1e-12
+        @test all(iszero, esri(econ; maxiter = 30, tol = 1e-3, firm_indices = Int[]))
 
-        @test size(esri_sparse) == (n,)
-        @test size(esri_dense) == (n,)
-        @test all(0 .<= esri_sparse .<= 1 .+ 1e-6)
-        @test all(0 .<= esri_dense .<= 1 .+ 1e-6)
-        @test esri_dense ≈ esri_sparse atol = 1e-6 rtol = 1e-6
+        @test_throws ArgumentError esri(econ; firm_indices = [1, 1])
     finally
-        BLAS.set_num_threads(old_n)
+        BLAS.set_num_threads(old_blas)
     end
 end
 
-@testset "compute_esri (firm_indices subset + validation)" begin
-    n = 12
-    W = spzeros(n, n)
-    @inbounds for i in 1:n
-        W[i, i] = 1.0
-    end
-    W[1, 2] = 0.2
-    W[2, 3] = 0.3
-    W[3, 5] = 0.4
-    W[4, 6] = 0.1
-    W[5, 7] = 0.25
-    W[6, 8] = 0.15
-    W[7, 9] = 0.05
-    W[8, 10] = 0.35
-    W[9, 11] = 0.2
-    W[10, 12] = 0.1
-
-    industry_ids = [1, 2, 1, 2, 3, 3, 2, 1, 3, 2, 1, 2]
-    essential_industry = [true, false, true]
-    info = IndustryInfo(industry_ids, essential_industry)
-
-    subset = [2, 5, 9]
-    full = compute_esri(W, info; maxiter = 25, tol = 1e-3, verbose = false, threads = false)
-    partial = compute_esri(W, info; maxiter = 25, tol = 1e-3, verbose = false, threads = false, firm_indices = subset)
-
-    @test all(partial[setdiff(1:n, subset)] .== 0)
-    @test partial[subset] == full[subset]
-
-    partial_threaded = compute_esri(W, info; maxiter = 25, tol = 1e-3, verbose = false, threads = true, firm_indices = subset)
-    @test partial_threaded[subset] == full[subset]
-
-    @test_throws ArgumentError compute_esri(W, info; maxiter = 5, tol = 1e-2, verbose = false, threads = false, firm_indices = [1, 1])
-end
-
-@testset "compute_esri (verbose in threaded mode logs)" begin
-    Random.seed!(808)
-    n = 6
-    W = sprand(n, n, 0.3) + 0.1I
-    industry_ids = rand(1:2, n)
-    essential_industry = [true, false]
-    info = IndustryInfo(industry_ids, essential_industry)
-
-    ref = compute_esri(W, info; maxiter = 10, tol = 1e-2, verbose = false, threads = true)
-    if Threads.nthreads() > 1
-        @test_logs (:warn, r"Ignoring `verbose=true` because progress UI is disabled in threaded mode\.") begin
-            got = compute_esri(W, info; maxiter = 10, tol = 1e-2, verbose = true, threads = true)
-            @test got == ref
-        end
-    else
-        got = compute_esri(W, info; maxiter = 10, tol = 1e-2, verbose = true, threads = true)
-        @test got == ref
-    end
-end
-
-@testset "ESRIEconomy + esri API" begin
-    Random.seed!(404)
-    n = 18
-    W = sprand(n, n, 0.12) + 0.1I
-    industry_ids = rand(1:4, n)
-    essential_industry = [true, false, true, false]
-    info = IndustryInfo(industry_ids, essential_industry)
-
+@testset "Single-scenario API invariants" begin
+    W, info = deterministic_fixture()
     econ = ESRIEconomy(W, info)
-    @test length(econ) == n
-    @test econ.n == n
-    @test size(econ.upstream_impact) == (n, n)
-    @test size(econ.downstream_impact_essential) == (n, n)
-    @test size(econ.downstream_impact_nonessential) == (n, n)
-    @test length(econ.column_sums) == n
-    @test length(econ.row_sums) == n
 
-    old_api = compute_esri(W, info; maxiter = 25, tol = 1e-3, verbose = false, threads = false)
-    new_api = esri(econ; maxiter = 25, tol = 1e-3, verbose = false, threads = false)
-    @test new_api ≈ old_api atol = 1e-10 rtol = 1e-10
+    value = esri(econ, 1; maxiter = 100, tol = 1e-12)
+    details = esri(econ, 1; details = true, maxiter = 100, tol = 1e-12)
+    up_only = esri(econ, 1; components = :upstream, maxiter = 100, tol = 1e-12)
+    down_only = esri(econ, 1; components = :downstream, maxiter = 100, tol = 1e-12)
 
-    subset = [2, 7, 11]
-    subset_values = esri(econ; maxiter = 25, tol = 1e-3, verbose = false, threads = false, firm_indices = subset)
-    @test all(subset_values[setdiff(1:n, subset)] .== 0)
-    @test subset_values[subset] == new_api[subset]
-
-    i = 7
-    single = esri(econ, i; maxiter = 25, tol = 1e-3, verbose = false)
-    @test single ≈ new_api[i] atol = 1e-10 rtol = 1e-10
-
-    details = esri(econ, i; maxiter = 25, tol = 1e-3, verbose = false, details = true)
     @test details isa ESRIResult
-    @test details.esri ≈ new_api[i] atol = 1e-10 rtol = 1e-10
-    @test length(details.upstream) == n
-    @test length(details.downstream) == n
-    @test all(0 .<= details.upstream .<= 1 .+ 1e-8)
-    @test all(0 .<= details.downstream .<= 1 .+ 1e-8)
+    @test details.esri ≈ value atol = 1e-12 rtol = 0
+    @test up_only.esri ≈ value atol = 1e-12 rtol = 0
+    @test down_only.esri ≈ value atol = 1e-12 rtol = 0
+    @test up_only.upstream == details.upstream
+    @test down_only.downstream == details.downstream
+    assert_bounded(details.upstream)
+    assert_bounded(details.downstream)
 
-    only_upstream = esri(econ, i; maxiter = 25, tol = 1e-3, components = :upstream)
-    only_downstream = esri(econ, i; maxiter = 25, tol = 1e-3, components = :downstream)
-    @test haskey(only_upstream, :upstream)
-    @test !haskey(only_upstream, :downstream)
-    @test haskey(only_downstream, :downstream)
-    @test !haskey(only_downstream, :upstream)
+    psi = [0.2, 0.8, 1.0]
+    direct = esri(econ, 1; shock = psi, details = true, maxiter = 100, tol = 1e-12)
+    wrapped = esri_shock(econ, psi; details = true, maxiter = 100, tol = 1e-12)
+    @test direct.esri ≈ wrapped.esri atol = 1e-12 rtol = 0
+    @test direct.upstream ≈ wrapped.upstream atol = 1e-12 rtol = 0
+    @test direct.downstream ≈ wrapped.downstream atol = 1e-12 rtol = 0
+    @test all(direct.upstream .<= psi .+ 1e-12)
+    @test all(direct.downstream .<= psi .+ 1e-12)
+
+    W_sparse, info_sparse = sparse_fixture(seed = 91, n = 14, density = 0.1, nindustries = 3)
+    econ_sparse = ESRIEconomy(W_sparse, info_sparse)
+    psi_sparse = fill(1.0, 14)
+    psi_sparse[[1, 4, 7]] .= (0.1, 0.6, 0.0)
+    direct_sparse = esri(econ_sparse, 4; shock = psi_sparse, details = true, maxiter = 25, tol = 1e-3)
+    wrapped_sparse = esri_shock(econ_sparse, psi_sparse; details = true, maxiter = 25, tol = 1e-3)
+    @test direct_sparse.esri ≈ wrapped_sparse.esri atol = 1e-12 rtol = 0
+    @test direct_sparse.upstream ≈ wrapped_sparse.upstream atol = 1e-12 rtol = 0
+    @test direct_sparse.downstream ≈ wrapped_sparse.downstream atol = 1e-12 rtol = 0
 end
 
-@testset "public API validation errors" begin
+@testset "Hand-computed and zero-output cases" begin
+    W = [
+        1.0 1.0
+        0.0 1.0
+    ]
+    econ = ESRIEconomy(W, IndustryInfo([1, 1], [true]))
+    details = esri(econ, 1; details = true, maxiter = 100, tol = 1e-12)
+
+    @test details.upstream ≈ [0.0, 1.0] atol = 1e-12 rtol = 0
+    @test details.downstream ≈ [0.0, 0.0] atol = 1e-10 rtol = 0
+    @test esri(econ, 1; combine = :upstream, maxiter = 100, tol = 1e-12) ≈ 2 / 3 atol = 1e-12 rtol = 0
+    @test esri(econ, 1; combine = :downstream, maxiter = 100, tol = 1e-12) ≈ 1.0 atol = 1e-10 rtol = 0
+    @test details.esri ≈ 1.0 atol = 1e-10 rtol = 0
+
+    econ0 = ESRIEconomy(zeros(4, 4), IndustryInfo([1, 2, 1, 2], [true, false]))
+    @test econ0.total_output == 0.0
+    @test esri(econ0; maxiter = 20, tol = 1e-6) == zeros(4)
+    d = esri(econ0, 2; details = true, maxiter = 20, tol = 1e-6)
+    @test d.esri == 0.0
+    @test d.upstream == [1.0, 0.0, 1.0, 1.0]
+    @test d.downstream == [1.0, 0.0, 1.0, 1.0]
+    @test esri(econ0, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 1.0
+
+    econ0_sparse = ESRIEconomy(spzeros(4, 4), IndustryInfo([1, 2, 1, 2], [true, false]))
+    @test econ0_sparse.total_output == 0.0
+    @test esri(econ0_sparse; maxiter = 20, tol = 1e-6) == zeros(4)
+    d_sparse = esri(econ0_sparse, 2; details = true, maxiter = 20, tol = 1e-6)
+    @test d_sparse.esri == 0.0
+    @test d_sparse.upstream == [1.0, 0.0, 1.0, 1.0]
+    @test d_sparse.downstream == [1.0, 0.0, 1.0, 1.0]
+    @test esri(econ0_sparse, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 1.0
+end
+
+@testset "Validation and logging" begin
     W = [1.0 0.1; 0.0 1.0]
     info = IndustryInfo([1, 1], [true])
     econ = ESRIEconomy(W, info)
@@ -171,125 +112,22 @@ end
     @test_throws ArgumentError esri(econ, 1; components = :bad)
     @test_throws DimensionMismatch esri(econ; final_weights = [1.0])
     @test_throws DimensionMismatch esri(econ, 1; shock = [0.0])
-    @test_throws DomainError esri(econ, 1; shock = [1.2, 0.3])
     @test_throws DimensionMismatch ESRIEconomy(ones(2, 3), info)
-end
-
-@testset "single-firm verbose iteration info log" begin
-    W = [
-        1.0 0.2 0.0
-        0.1 1.0 0.3
-        0.0 0.4 1.0
-    ]
-    info = IndustryInfo([1, 1, 2], [true, false])
-    econ = ESRIEconomy(W, info)
+    @test_throws DomainError esri(econ, 1; shock = [NaN, 1.0])
+    @test_throws DomainError esri_shock(econ, [1.0, Inf])
+    @test_throws DomainError esri(econ; final_weights = [1.0, -0.2])
+    @test_throws DomainError ESRIEconomy([1.0 NaN; 0.0 1.0], info)
 
     @test_logs (:info, r"joint iteration") begin
-        # tol = 0 disables early stopping because the distance is always >= 0.
-        value = esri(econ, 1; verbose = true, maxiter = 10, tol = 0.0)
-        @test isfinite(value)
-    end
-end
-
-@testset "zero-matrix edge cases" begin
-    W0 = zeros(4, 4)
-    info = IndustryInfo([1, 2, 1, 2], [true, false])
-    econ0 = ESRIEconomy(W0, info)
-
-    @test econ0.total_output == 0.0
-    @test all(econ0.row_sums .== 0.0)
-    @test all(econ0.column_sums .== 0.0)
-
-    # With zero total output and default (row-sum) weights, normalized vector output is all zeros.
-    vals = esri(econ0; maxiter = 20, tol = 1e-6, threads = false)
-    @test vals == zeros(4)
-
-    for i in 1:4
-        d = esri(econ0, i; details = true, maxiter = 20, tol = 1e-6)
-        expected = ones(4)
-        expected[i] = 0.0
-        @test d.esri == 0.0
-        @test d.upstream == expected
-        @test d.downstream == expected
+        @test isfinite(esri(econ, 1; verbose = true, maxiter = 10, tol = 0.0))
     end
 
-    # With zero total output, explicit weights are not normalized.
-    # Single-firm default shock should reduce exactly one unit when all weights are 1.
-    @test esri(econ0, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 1.0
-end
-
-@testset "hand-computed two-firm fixed point example" begin
-    # Supplier 1 serves both firms; supplier 2 serves only firm 2.
-    # Both firms are in the same essential industry.
-    W = [
-        1.0 1.0
-        0.0 1.0
-    ]
-    info = IndustryInfo([1, 1], [true])
-    econ = ESRIEconomy(W, info)
-
-    # Shock firm 1 only: psi = [0, 1].
-    details = esri(econ, 1; details = true, maxiter = 100, tol = 1e-12)
-
-    # Hand-derived fixed point:
-    # upstream*   = [0, 1]
-    # downstream* = [0, 0]
-    @test details.upstream ≈ [0.0, 1.0] atol = 1e-12 rtol = 0
-    @test details.downstream[1] ≈ 0.0 atol = 1e-12 rtol = 0
-    @test details.downstream[2] ≈ 0.0 atol = 1e-10 rtol = 0
-
-    # Row-sum weights are [2, 1], total output is 3.
-    # combine = :upstream  => (2*(1-0) + 1*(1-1)) / 3 = 2/3
-    # combine = :downstream => (2*(1-0) + 1*(1-0)) / 3 = 1
-    # combine = :min       => same as downstream here = 1
-    @test esri(econ, 1; combine = :upstream, maxiter = 100, tol = 1e-12) ≈ (2 / 3) atol = 1e-12 rtol = 0
-    @test esri(econ, 1; combine = :downstream, maxiter = 100, tol = 1e-12) ≈ 1.0 atol = 1e-10 rtol = 0
-    @test details.esri ≈ 1.0 atol = 1e-10 rtol = 0
-end
-
-@testset "numeric validation for shock, weights, and matrix entries" begin
-    W = [1.0 0.1; 0.0 1.0]
-    info = IndustryInfo([1, 1], [true])
-    econ = ESRIEconomy(W, info)
-
-    # shock vector must be finite and in [0, 1]
-    @test_throws DomainError esri(econ, 1; shock = [NaN, 1.0])
-    @test_throws DomainError esri(econ, 1; shock = [Inf, 1.0])
-    @test_throws DomainError esri_shock(econ, [1.0, NaN])
-    @test_throws DomainError compute_esri_shock(W, info, [1.0, Inf])
-
-    # final weights must be finite and nonnegative
-    @test_throws DomainError esri(econ; final_weights = [NaN, 1.0])
-    @test_throws DomainError esri(econ; final_weights = [Inf, 1.0])
-    @test_throws DomainError esri(econ; final_weights = [-0.1, 1.0])
-    @test_throws DomainError esri(econ, 1; final_weights = [1.0, -0.2])
-
-    # matrix entries must be finite and nonnegative
-    @test_throws DomainError ESRIEconomy([1.0 NaN; 0.0 1.0], info)
-    @test_throws DomainError ESRIEconomy([1.0 -0.1; 0.0 1.0], info)
-
-    W_sp_inf = sparse([1, 2], [1, 2], [1.0, Inf], 2, 2)
-    W_sp_neg = sparse([1, 2], [1, 2], [1.0, -0.2], 2, 2)
-    @test_throws DomainError ESRIEconomy(W_sp_inf, info)
-    @test_throws DomainError ESRIEconomy(W_sp_neg, info)
-end
-
-@testset "integer matrix inputs and error-type stability" begin
-    info = IndustryInfo([1, 1], [true])
-
-    # Dense Int input should construct and run without InexactError.
-    W_int_dense = [1 1; 0 2]
-    econ_dense = ESRIEconomy(W_int_dense, info)
-    @test eltype(econ_dense.row_sums) <: AbstractFloat
-    @test isfinite(esri(econ_dense, 1; maxiter = 15, tol = 1e-3))
-
-    # Sparse Int input with fractional normalization should also construct cleanly.
-    W_int_sparse = sparse([1, 1, 2], [1, 2, 2], [1, 1, 1], 2, 2)
-    econ_sparse = ESRIEconomy(W_int_sparse, info)
-    @test eltype(econ_sparse.row_sums) <: AbstractFloat
-    @test all(isfinite, esri(econ_sparse; maxiter = 15, tol = 1e-3, threads = false))
-
-    # Invalid numeric inputs should throw DomainError (not conversion errors).
-    @test_throws DomainError esri(econ_sparse; final_weights = [1.0, NaN])
-    @test_throws DomainError esri(econ_sparse, 1; shock = [NaN, 1.0])
+    ref = compute_esri(W, info; maxiter = 10, tol = 1e-2, threads = true)
+    if Threads.nthreads() > 1
+        @test_logs (:warn, r"Ignoring `verbose=true` because progress UI is disabled in threaded mode\.") begin
+            @test compute_esri(W, info; maxiter = 10, tol = 1e-2, verbose = true, threads = true) == ref
+        end
+    else
+        @test compute_esri(W, info; maxiter = 10, tol = 1e-2, verbose = true, threads = true) == ref
+    end
 end

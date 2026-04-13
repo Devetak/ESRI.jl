@@ -1,13 +1,11 @@
 # Performance
 
-The main cost split is fixed. `ESRIEconomy(W, info)` builds the normalized upstream and downstream operators once. Each subsequent call solves one or more fixed-point problems on that precomputed state. If the network does not change, build `ESRIEconomy` once and reuse it.
+Build `ESRIEconomy(W, info)` once and reuse it. That is the main performance rule.
 
-For large networks, pass `W` as `SparseMatrixCSC`. The package has sparse kernels for the upstream step and sparse downstream operator storage. Dense input is supported, but it is not the intended mode for large national supply graphs.
+For large networks, pass `W` as `SparseMatrixCSC`. The sparse kernels are the intended path for large supply graphs.
 
-`threads = true` applies to economy-wide `esri(econ; ...)` and `compute_esri(W, info; ...)`. It parallelizes across shocked firms. It does not parallelize one single-scenario solve such as `esri(econ, firm_idx; ...)` or `esri_shock(econ, psi; ...)`.
+`threads=true` applies only to economy-wide `esri(econ; ...)` and `compute_esri(W, info; ...)`. It parallelizes across shocked firms, not within one single-scenario solve.
 
-The memory cost in threaded economy-wide runs is higher because each worker keeps its own buffers for upstream state, downstream state, industry sums, and shock vector.
+The cost of an economy-wide run still grows with the number of shocked firms because the package solves one fixed point per scenario. Use `firm_indices` when only a subset is needed.
 
-`firm_indices` is the main way to reduce work when only part of the economy-wide shock set is needed.
-
-`verbose = true` shows progress in serial economy-wide runs and iteration logs in single-scenario runs. In threaded economy-wide runs the progress display is disabled and the package ignores `verbose = true`.
+Threaded economy-wide runs use more memory because each worker keeps its own buffers. `verbose=true` shows progress in serial economy-wide runs and iteration logs in single-scenario runs. In threaded economy-wide runs it is ignored.

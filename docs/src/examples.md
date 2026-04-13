@@ -68,8 +68,6 @@ true
 
 ## Custom shock vector
 
-The package takes a capacity cap vector `psi`. The entry `0.0` is a full closure. The entry `0.5` is a half-closure. The entry `1.0` leaves the firm uncapped.
-
 ```@doctest
 psi = ones(N)
 psi[1] = 0.0
@@ -85,8 +83,6 @@ true
 ```
 
 ## Single-firm call with explicit shock
-
-When `shock=psi` is supplied, the scenario is `psi`. The package does not add a second closure on `firm_idx`.
 
 ```@doctest
 psi2 = ones(N)

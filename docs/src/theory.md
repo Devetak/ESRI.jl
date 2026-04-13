@@ -2,6 +2,8 @@
 
 Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix with entry `W_{ij}` equal to supply from firm `i` to firm `j`. Let `g(i)` be the industry of firm `i`. Let `e_k \in \{0,1\}` be the essentiality flag of industry `k`. In the package input, firm `i` is essential exactly when `e_{g(i)} = 1`.
 
+Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap scenario `\psi \in [0,1]^N`.
+
 Define firm output and input totals by
 
 ```math
@@ -60,7 +62,7 @@ D^{(n)}_{ij} =
 \end{cases}
 ```
 
-## Industry scaling
+## Supplier rationing factor
 
 Given `d^{(t)}`, define the current industry mass
 
@@ -68,7 +70,7 @@ Given `d^{(t)}`, define the current industry mass
 M_k^{(t)} = \sum_{m:g(m)=k} r_m d_m^{(t)}.
 ```
 
-The package then defines
+The package defines the supplier rationing factor
 
 ```math
 \sigma_i^{(t)} =
@@ -126,7 +128,7 @@ u^{(0)} = \mathbf{1},
 d^{(0)} = \mathbf{1}.
 ```
 
-It iterates the coupled upstream and downstream map until
+It iterates the upstream and downstream recursions in lockstep until
 
 ```math
 \max\!\left(
@@ -160,7 +162,7 @@ If `\sum_i r_i = 0`, the package returns the unnormalized numerator.
 
 ## Relation to the paper
 
-The package follows the same ESRI setup used in Diem et al., Scientific Reports 12, 6214 (2022), and the accompanying supplementary information in `paper/`. The package input contract is narrower. It takes firm industry labels and one Boolean essentiality flag per industry. The original reference code in `Economic-Systemic-Risk/` classifies edge types from a sector-pair table and constructs scenarios through `psi_mat`. The formulas on this page state the current package implementation.
+The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022), but with a narrower input contract. The bundled reference code in `Economic-Systemic-Risk/` classifies edge types from sector-pair data and builds scenarios through `psi_mat`; this package takes firm industry labels, one Boolean essentiality flag per industry, and `\psi \in [0,1]^N`.
 
 ## References
 

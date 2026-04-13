@@ -1,23 +1,16 @@
 # ESRI.jl
 
-`ESRI.jl` computes firm-level ESRI values on a directed firm-to-firm supply network.
+`ESRI.jl` computes firm-level ESRI values on directed supply networks.
 
-The package takes a square weight matrix `W`, a firm-to-industry map, and an industry-level essentiality vector. It builds a reusable `ESRIEconomy` object and then solves either one shock per firm or one custom shock vector.
+Inputs are a square weight matrix `W`, one industry id per firm, and one Boolean essentiality flag per industry. This package keeps the paper's upstream/downstream ESRI structure, but it narrows the inputs to that simpler contract and treats `psi` as a capacity-cap vector in `[0,1]^N`.
 
-The package is built around three exported entry points. `ESRIEconomy(W, info)` precomputes the linear operators and baseline weights. `esri(econ; ...)` computes one default firm shock for each selected firm. `esri_shock(econ, psi; ...)` computes one custom scenario with capacity cap vector `psi`.
+`ESRIEconomy(W, info)` caches the operators and weights. `esri(econ; ...)` computes the default single-firm closures. `esri_shock(econ, psi; ...)` computes one explicit scenario.
 
 ## Installation
 
 ```julia
 using Pkg
-Pkg.add("ESRI")
-```
-
-For local documentation builds, run
-
-```julia
-julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
-julia --project=docs docs/make.jl
+Pkg.add(url = "https://github.com/Devetak/ESRI.jl")
 ```
 
 ## Quick start
@@ -27,9 +20,7 @@ using ESRI, SparseArrays, LinearAlgebra
 
 N = 50
 W = sprand(N, N, 0.08) + 0.1I
-industry_ids = rand(1:4, N)
-essential_industry = [true, true, false, false]
-info = IndustryInfo(industry_ids, essential_industry)
+info = IndustryInfo(rand(1:4, N), [true, true, false, false])
 
 econ = ESRIEconomy(W, info)
 scores = esri(econ; maxiter = 40, tol = 1e-3)
@@ -38,6 +29,4 @@ length(scores), minimum(scores) >= 0, maximum(scores) <= 1
 (50, true, true)
 ```
 
-The main performance rule is simple. Build `ESRIEconomy` once. Reuse it for all runs on the same network.
-
-The theory page states the operators and fixed-point equations used by the package. The examples page states the calling patterns. The API page states the exact keyword behavior and return shapes.
+Build `ESRIEconomy` once and reuse it on the same network. The theory page gives the equations, the API page gives keyword behavior and return shapes, and the examples page shows the main call patterns.

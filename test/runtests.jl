@@ -5,6 +5,7 @@ using LinearAlgebra: I, BLAS
 
 using ESRI
 
+include("test_helpers.jl")
 include("test_types.jl")
 include("test_primitives.jl")
 include("test_core_api.jl")

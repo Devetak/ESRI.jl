@@ -22,6 +22,20 @@
     @test d2_dense[3, 2] == 0
     @test Matrix(d1_sparse) ≈ d1_dense atol = 1e-12 rtol = 0
     @test Matrix(d2_sparse) ≈ d2_dense atol = 1e-12 rtol = 0
+
+    W3 = sparse([1, 3], [2, 1], [2.0, 4.0], 4, 4)
+    info3 = IndustryInfo([1, 2, 1, 2], [true, false])
+    u3_dense = ESRI.create_upstream_impact_matrix(Matrix(W3))
+    u3_sparse = ESRI.create_upstream_impact_matrix(W3)
+    e3_dense, n3_dense = ESRI.compute_downstream_impact_matrices(Matrix(W3), info3)
+    e3_sparse, n3_sparse = ESRI.compute_downstream_impact_matrices(W3, info3)
+
+    @test Matrix(u3_sparse) ≈ u3_dense atol = 1e-12 rtol = 0
+    @test Matrix(e3_sparse) ≈ e3_dense atol = 1e-12 rtol = 0
+    @test Matrix(n3_sparse) ≈ n3_dense atol = 1e-12 rtol = 0
+    @test Matrix(u3_sparse)[:, 2] == zeros(4)
+    @test Matrix(e3_sparse)[:, 4] == zeros(4)
+    @test Matrix(n3_sparse)[:, 4] == zeros(4)
 end
 
 @testset "Propagation kernels" begin

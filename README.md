@@ -1,28 +1,20 @@
 # ESRI.jl
 
-ESRI.jl computes, for each firm, the share of the economy that depends on that firm in `[0, 1]`.
+`ESRI.jl` computes firm-level economic systemic risk on directed supply networks.
 
-## Documentation
+The package follows the ESRI setup of Diem et al. (2022) with a narrower input contract:
 
-- Source docs (with equations): `docs/src/`
-- Build locally:
-  - `julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'`
-  - `julia --project=docs docs/make.jl`
+- `W` is a square firm-to-firm weight matrix.
+- `IndustryInfo` uses one industry id per firm and one Boolean essentiality flag per industry.
+- `psi` is always a capacity-cap vector in `[0,1]^N`.
+
+Build `ESRIEconomy(W, info)` once and reuse it when the network is fixed.
 
 ## Installation
-
-Install from this repository (current work-in-progress):
 
 ```julia
 using Pkg
 Pkg.add(url = "https://github.com/Devetak/ESRI.jl")
-```
-
-After registration in the General registry:
-
-```julia
-using Pkg
-Pkg.add("ESRI")
 ```
 
 For local development:
@@ -32,73 +24,74 @@ using Pkg
 Pkg.develop(path = "/path/to/ESRI.jl")
 ```
 
-## Quick start (sparse only)
+## Quick start
 
 ```julia
 using ESRI, SparseArrays
 using LinearAlgebra: I
 
 N = 1_000
-W = sprand(N, N, 0.01) + 0.1I # supplier weights (sparse)
-industry_ids = rand(1:5, N)
-essential_industry = [true, true, true, false, false]
-info = IndustryInfo(industry_ids, essential_industry)
+W = sprand(N, N, 0.01) + 0.1I
+info = IndustryInfo(rand(1:5, N), [true, true, true, false, false])
 
 econ = ESRIEconomy(W, info)
-esri_all = esri(econ; maxiter = 50, tol = 1e-3, threads = true)
-esri_i = esri(econ, 10; maxiter = 50, tol = 1e-3)
-details_i = esri(econ, 10; maxiter = 50, tol = 1e-3, details = true)
-esri_wrapper = compute_esri(W, info; maxiter = 50, tol = 1e-3)
+scores = esri(econ; maxiter = 50, tol = 1e-3, threads = true)
+value = esri(econ, 10; maxiter = 50, tol = 1e-3)
+details = esri(econ, 10; maxiter = 50, tol = 1e-3, details = true)
 ```
 
-## Feature Flags (new)
+## Key calls
 
-```julia
-# custom final weights (default: econ.row_sums)
-scores_w = esri(econ; final_weights = rand(N))
+- `esri(econ; ...)` computes the default single-firm closure for each selected firm. If `firm_indices` is set, unrequested entries stay zero.
+- `esri(econ, firm_idx; ...)` solves one scenario and returns a scalar, a named tuple, or `ESRIResult`.
+- `esri_shock(econ, psi; ...)` solves one scenario from an explicit capacity cap vector `psi ∈ [0,1]^N`.
+- `final_weights` changes only the numerator of the final ESRI reduction.
+- `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. It does not add a second shock on top.
 
-# final reduction mode (default: :min)
-scores_u = esri(econ; combine = :upstream)
-scores_d = esri(econ; combine = :downstream)
+## Docs
 
-# single-firm + custom shock vector in [0,1]
-psi = ones(N); psi[1:10] .= 0.5
-one_firm = esri(econ, 7; shock = psi, details = true)
+- Source docs: `docs/src/`
+- Build locally:
+  - `julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'`
+  - `julia --project=docs docs/make.jl`
 
-# direct shock scenario API (no firm index)
-scenario = esri_shock(econ, psi; combine = :min)
+## Reference benchmarks
+
+Local reference runs from `2026-04-12` on `Apple M2`, with `JULIA_NUM_THREADS=1`, `mean_degree=7`, `alpha=2.3`, `nindustries=50`, and `maxiter=30`. These timings call full `esri(econ; ...)` over all firms.
+
+| mode | firms | nnz | max_degree | p99_degree | top1pct_edge_share | build_s | solve_s |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `truncated_tail` | 5_000 | 35_000 | 111 | 25 | 0.0637 | 0.0312 | 6.5329 |
+| `heavy_tail` | 5_000 | 35_000 | 385 | 26 | 0.0928 | 0.0020 | 5.7411 |
+| `truncated_tail` | 10_000 | 70_000 | 128 | 24 | 0.0616 | 0.0388 | 26.6213 |
+| `heavy_tail` | 10_000 | 70_000 | 964 | 25 | 0.1071 | 0.0334 | 26.4600 |
+
+Run with:
+
+```bash
+julia --project benchmark/sparse_powerlaw_esri.jl 10000 truncated_tail
+julia --project benchmark/sparse_powerlaw_esri.jl 10000 heavy_tail
 ```
 
-## Performance / execution model
+Quick full-solve smoke benchmark:
 
-ESRI iterates upstream/downstream dynamics per firm, then aggregates a firm ESRI value.
-Use `threads=true` in `esri(econ; ...)` (or `compute_esri`) to parallelize across firms.
-
-## Multiprocessing transparency
-
-Threading is explicit in `esri(econ; ...)`; dense linear algebra may still use BLAS threads.
-
-## Reproducibility
-
-```julia
-using Random
-Random.seed!(42)
+```bash
+julia --project test/perf_full_powerlaw_esri.jl
 ```
 
-## Reference paper
+Larger manual references:
+
+```bash
+julia --project benchmark/sparse_powerlaw_esri.jl 50000 truncated_tail
+julia --project benchmark/sparse_powerlaw_esri.jl 50000 heavy_tail
+```
+
+These are local reference numbers, not CI guarantees.
+
+## Reference
 
 Diem, C. et al. *Quantifying firm-level economic systemic risk from nation-wide supply networks* (Scientific Reports, 2022): https://www.nature.com/articles/s41598-022-11522-z
 
-## Public API
-
-- `IndustryInfo(industry_ids::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})`
-- `ESRIEconomy(weight_matrix, info::IndustryInfo)`
-- `esri(econ::ESRIEconomy; maxiter=100, tol=1e-2, verbose=false, threads=false, firm_indices=nothing, final_weights=nothing, combine=:min)`
-- `esri(econ::ESRIEconomy, firm_idx::Integer; maxiter=100, tol=1e-2, verbose=false, details=false, components=:none, final_weights=nothing, combine=:min, shock=nothing)`
-- `esri_shock(econ::ESRIEconomy, shock; maxiter=100, tol=1e-2, verbose=false, details=false, components=:none, final_weights=nothing, combine=:min)`
-- `compute_esri(weight_matrix, info; maxiter=100, tol=1e-2, verbose=false, kwargs...)`
-- `compute_esri_shock(weight_matrix, info, shock; maxiter=100, tol=1e-2, verbose=false, kwargs...)`
-
 ## License
 
-ESRI.jl is open source and released under the MIT License. See `LICENSE` for details.
+MIT. See `LICENSE`.

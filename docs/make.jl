@@ -19,9 +19,10 @@ makedocs(
     ],
 )
 
-if haskey(ENV, "DOCUMENTER_KEY")
+if !isempty(get(ENV, "DOCUMENTER_KEY", ""))
     deploydocs(
         repo = "github.com/Devetak/ESRI.jl.git",
         devbranch = "main",
+        push_preview = true,
     )
 end

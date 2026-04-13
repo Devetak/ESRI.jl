@@ -1,5 +1,7 @@
 # ESRI.jl
 
+[![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://devetak.github.io/ESRI.jl/)
+
 `ESRI.jl` computes firm-level economic systemic risk on directed supply networks.
 
 The package follows the ESRI setup of Diem et al. (2022) with a narrower input contract:

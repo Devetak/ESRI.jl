@@ -58,6 +58,8 @@ psi[3] = 0.5
 psi[4] = 0.5
 psi[5] = 0.8
 
+# Here psi[i] is firm i's exogenous capacity cap:
+# 1.0 = unaffected, 0.0 = closed, values in between = partial capacity.
 scenario = esri_shock(econ, psi; details = true, maxiter = 25, tol = 1e-3)
 ```
 

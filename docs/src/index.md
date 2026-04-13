@@ -4,7 +4,7 @@
 
 Inputs are a square weight matrix `W` representing the supply chain, one industry id per firm, and one Boolean essentiality flag per industry.
 
-`ESRIEconomy(W, info)` caches the operators and weights for further reuse. `esri(econ; ...)` computes the default single-firm closures. `esri_shock(econ, psi; ...)` computes one explicit scenario.
+`ESRIEconomy(W, info)` caches the operators and weights for further reuse. `esri(econ; ...)` computes the default single-firm closures. `esri_shock(econ, psi; ...)` computes one explicit scenario from a firm-level capacity-cap vector `psi`, where `1` means unaffected and `0` means closed.
 
 ## Installation
 

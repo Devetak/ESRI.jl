@@ -12,7 +12,7 @@
 
 `esri(econ; maxiter=100, tol=1e-2, verbose=false, threads=false, firm_indices=nothing, final_weights=nothing, combine=:min)` returns one ESRI value per firm. If `firm_indices` is set, only those default single-firm closures are computed and all other entries stay zero.
 
-`esri(econ, firm_idx; maxiter=100, tol=1e-2, verbose=false, details=false, components=:none, final_weights=nothing, combine=:min, shock=nothing)` solves one scenario. By default it closes `firm_idx`. If `shock=psi` is given, `psi ∈ [0,1]^N` is the whole scenario.
+`esri(econ, firm_idx; maxiter=100, tol=1e-2, verbose=false, details=false, components=:none, final_weights=nothing, combine=:min, shock=nothing)` solves one scenario. By default it closes `firm_idx`. If `shock=psi` is given, then `psi ∈ [0,1]^N` is the whole scenario: `psi[i] = 1` means no exogenous shock to firm `i`, `psi[i] = 0` means firm `i` is closed, and intermediate values cap firm `i` at partial capacity.
 
 `esri_shock(econ, shock; ...)` solves one scenario from an explicit capacity-cap vector `shock ∈ [0,1]^N`.
 

@@ -2,11 +2,17 @@
 
 Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix with entry `W_{ij}` equal to supply from firm `i` to firm `j`. Let `g(i)` be the industry of firm `i`. Let `e_k \in \{0,1\}` be the essentiality flag of industry `k`. In the package input, firm `i` is essential exactly when `e_{g(i)} = 1`.
 
-Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap scenario `\psi \in [0,1]^N`.
+Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap vector `\psi \in [0,1]^N`.
 
-`\psi` is the shock scenario if all entries are `1` then no firm is shocked. If a firm is dead
+The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, firm `i` can operate at at most a `\psi_i` fraction of its baseline capacity. Thus:
 
-The ESRI score of a firm as presented by Diem et al. is the total loss at a steady state where `\psi` is `1` for all indexes except the index corresponding to that firm. The `\psi` formulation allows for more general scenarios.
+- `\psi_i = 1` means no exogenous shock to firm `i`.
+- `\psi_i = 0` means firm `i` is fully closed.
+- `0 < \psi_i < 1` means firm `i` is partially capacity constrained.
+
+If all entries of `\psi` are `1`, then no firm is exogenously shocked.
+
+The ESRI score of a firm as presented by Diem et al. is the total loss at a steady state where `\psi` is `1` for all indices except the index corresponding to that firm, where it is `0`. The `\psi` formulation allows for more general multi-firm and partial-capacity scenarios.
 
 Define firm output and input totals by
 

@@ -1,7 +1,7 @@
 """
     IndustryInfo(industry_of_firm, essential_industry)
 
-Metadata for industry membership and essentiality flags.
+Firm industry ids and per-industry essentiality flags.
 """
 struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
     industry_of_firm::TI
@@ -12,7 +12,7 @@ end
 """
     ESRIEconomy
 
-Precomputed model state used by `esri` and `esri_shock`.
+Cached operators, weights, and totals for repeated ESRI runs.
 """
 struct ESRIEconomy{T,I<:IndustryInfo,TU,TD,VT<:AbstractVector{T}}
     info::I
@@ -28,7 +28,7 @@ end
 """
     ESRIResult
 
-Full single-scenario output with scalar ESRI and upstream/downstream vectors.
+Single-scenario ESRI plus converged upstream and downstream states.
 """
 struct ESRIResult{T}
     esri::T
@@ -39,10 +39,9 @@ end
 """
     IndustryInfo(industry_of_firm::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})
 
-Build immutable industry metadata used by ESRI computations.
-
-- `industry_of_firm[i]` is the 1-based industry id of firm `i`
-- `essential_industry[k]` marks whether industry `k` is essential
+Build immutable industry metadata for ESRI.
+`industry_of_firm[i]` is the 1-based industry id of firm `i`.
+`essential_industry[k]` marks whether industry `k` is essential.
 """
 function IndustryInfo(
     industry_of_firm::AbstractVector{<:Integer},

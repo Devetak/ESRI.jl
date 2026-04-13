@@ -7,7 +7,16 @@ function create_upstream_impact_matrix(weight_matrix::AbstractMatrix{T}) where {
     nrows, ncols = size(weight_matrix)
     TF = float(T)
     result = zeros(TF, nrows, ncols)
-    row_sums = vec(sum(TF.(weight_matrix), dims = 2))
+    row_sums = zeros(TF, nrows)
+
+    @inbounds for source = 1:nrows
+        acc = zero(TF)
+        for target = 1:ncols
+            acc += weight_matrix[source, target]
+        end
+        row_sums[source] = acc
+    end
+
     @inbounds for source = 1:nrows
         denom = row_sums[source]
         if denom == 0
@@ -74,33 +83,35 @@ function compute_downstream_impact_matrices(
     nrows, ncols = size(weight_matrix)
     essential = zeros(TF, nrows, ncols)
     nonessential = zeros(TF, nrows, ncols)
-    num_inds = num_industries(info)
-    essential_by_industry = zeros(TF, num_inds)
+    industry_of_firm = info.industry_of_firm
+    essential_firm = info.essential_firm
+    essential_by_industry = zeros(TF, num_industries(info))
+    zeroT = zero(TF)
 
     @inbounds for col = 1:ncols
-        fill!(essential_by_industry, zero(TF))
-        all_suppliers_total = zero(TF)
-        for idx = 1:nrows
-            val = weight_matrix[idx, col]
+        fill!(essential_by_industry, zeroT)
+        total = zeroT
+        for row = 1:nrows
+            val = weight_matrix[row, col]
             if val == 0
                 continue
             end
-            all_suppliers_total += val
-            if is_essential(info, idx)
-                essential_by_industry[get_industry(info, idx)] += val
+            total += val
+            if essential_firm[row]
+                essential_by_industry[industry_of_firm[row]] += val
             end
         end
 
-        for idx = 1:nrows
-            val = weight_matrix[idx, col]
+        for row = 1:nrows
+            val = weight_matrix[row, col]
             if val == 0
                 continue
             end
-            if is_essential(info, idx)
-                denom = essential_by_industry[get_industry(info, idx)]
-                essential[idx, col] = denom == 0 ? zero(TF) : val / denom
+            if essential_firm[row]
+                denom = essential_by_industry[industry_of_firm[row]]
+                essential[row, col] = denom == 0 ? zeroT : val / denom
             else
-                nonessential[idx, col] = all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
+                nonessential[row, col] = val / total
             end
         end
     end
@@ -203,7 +214,7 @@ end
 """
     ESRIEconomy(weight_matrix, info::IndustryInfo)
 
-Precompute normalized upstream/downstream impact operators and firm output weights.
+Cache normalized upstream/downstream operators, output weights, and totals.
 """
 function ESRIEconomy(weight_matrix::AbstractMatrix{T}, info::IndustryInfo) where {T<:Real}
     n = length(info)

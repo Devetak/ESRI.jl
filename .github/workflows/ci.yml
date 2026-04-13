@@ -5,19 +5,30 @@ on:
   pull_request:
 
 jobs:
-  test:
-    name: Julia ${{ matrix.julia-version }} (threads)
+  test-serial:
+    name: Tests (serial)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        julia-version: ['1.12']
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
-          version: ${{ matrix.julia-version }}
-      - name: Run tests
+          version: '1.12'
+      - uses: julia-actions/cache@v2
+      - name: Run package tests
+        env:
+          JULIA_NUM_THREADS: 1
+        run: julia --project=. -e 'using Pkg; Pkg.test()'
+
+  test-threaded:
+    name: Tests (threaded)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+      - uses: julia-actions/cache@v2
+      - name: Run package tests
         env:
           JULIA_NUM_THREADS: 4
         run: julia --project=. -e 'using Pkg; Pkg.test()'
@@ -30,6 +41,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.12'
+      - uses: julia-actions/cache@v2
       - name: Run quality tests
         env:
           JULIA_NUM_THREADS: 1
@@ -43,6 +55,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.12'
+      - uses: julia-actions/cache@v2
       - name: Install docs dependencies
         run: julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
       - name: Build docs

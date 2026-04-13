@@ -9,6 +9,14 @@
         scores_sparse = esri(econ; maxiter = 30, tol = 1e-3, threads = false)
         scores_dense = compute_esri(W_dense, info; maxiter = 30, tol = 1e-3, threads = false)
         scores_threaded = esri(econ; maxiter = 30, tol = 1e-3, threads = true)
+        manual_threaded = zeros(econ.n)
+        tasks = map(1:econ.n) do firm_idx
+            Threads.@spawn firm_idx => esri(econ, firm_idx; maxiter = 30, tol = 1e-3)
+        end
+        for task in tasks
+            result = fetch(task)
+            manual_threaded[result.first] = result.second
+        end
 
         @test length(econ) == size(W_sparse, 1) == econ.n
         @test size(econ.upstream_impact) == size(W_sparse)
@@ -17,7 +25,8 @@
         assert_bounded(scores_sparse; atol = 1e-6)
         assert_bounded(scores_dense; atol = 1e-6)
         @test scores_sparse ≈ scores_dense atol = 1e-6 rtol = 1e-6
-        @test scores_sparse == scores_threaded
+        @test scores_sparse ≈ scores_threaded atol = 1e-12 rtol = 1e-12
+        @test scores_threaded ≈ manual_threaded atol = 1e-12 rtol = 1e-12
 
         subset = [2, 5, 9]
         subset_scores = esri(econ; maxiter = 30, tol = 1e-3, firm_indices = subset)

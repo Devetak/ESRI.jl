@@ -59,8 +59,17 @@ end
     explicit_scores = esri(econ; maxiter = 35, tol = 1e-3, threads = false, firm_indices = collect(1:size(W_sparse, 1)))
     dense_scores = compute_esri(W_dense, info; maxiter = 35, tol = 1e-3, threads = false)
     threaded_scores = compute_esri(W_sparse, info; maxiter = 35, tol = 1e-3, threads = true)
+    manual_threaded = zeros(size(W_sparse, 1))
+    tasks = map(1:size(W_sparse, 1)) do firm_idx
+        Threads.@spawn firm_idx => esri(econ, firm_idx; maxiter = 35, tol = 1e-3)
+    end
+    for task in tasks
+        result = fetch(task)
+        manual_threaded[result.first] = result.second
+    end
 
     @test sparse_scores ≈ explicit_scores atol = 1e-10 rtol = 1e-10
     @test sparse_scores ≈ dense_scores atol = 1e-8 rtol = 1e-8
-    @test sparse_scores == threaded_scores
+    @test sparse_scores ≈ threaded_scores atol = 1e-12 rtol = 1e-12
+    @test threaded_scores ≈ manual_threaded atol = 1e-12 rtol = 1e-12
 end

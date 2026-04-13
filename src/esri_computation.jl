@@ -184,10 +184,6 @@ function _allocate_workspace(::Type{T}, n::Int, num_inds::Int) where {T}
     )
 end
 
-function _thread_workspaces(::Type{T}, n::Int, num_inds::Int, nt::Int) where {T}
-    return [_allocate_workspace(T, n, num_inds) for _ in 1:nt]
-end
-
 function _default_shock!(psi::AbstractVector{T}, firm_idx::Integer) where {T}
     fill!(psi, one(T))
     psi[firm_idx] = zero(T)
@@ -295,6 +291,36 @@ function _compute_single_esri!(
     return _reduce_esri(current_upstream, current_downstream, final_weights, combine)
 end
 
+function _solve_default_firm_esri(
+    econ::ESRIEconomy{T},
+    final_weights::AbstractVector{T},
+    firm_idx::Integer,
+    combine::Symbol,
+    maxiter::Int,
+    tol::Real,
+) where {T}
+    workspace = _allocate_workspace(T, econ.n, num_industries(econ.info))
+    _default_shock!(workspace.psi, firm_idx)
+    value = _compute_single_esri!(
+        econ,
+        workspace.current_upstream,
+        workspace.previous_upstream,
+        workspace.current_downstream,
+        workspace.previous_downstream,
+        workspace.sigmas,
+        workspace.essential_matrix,
+        workspace.temp_sums,
+        workspace.nonessential_vector,
+        workspace.psi,
+        final_weights;
+        combine = combine,
+        maxiter = maxiter,
+        tol = tol,
+        verbose = false,
+    )
+    return _normalize_esri(value, econ)
+end
+
 function _economywide_esri(
     econ::ESRIEconomy{T},
     weights::AbstractVector{T},
@@ -307,67 +333,29 @@ function _economywide_esri(
 ) where {T}
     values = zeros(T, econ.n)
     use_threads = threads && Threads.nthreads() > 1
-    num_inds = num_industries(econ.info)
 
     if use_threads
         if verbose
             @warn "Ignoring `verbose=true` because progress UI is disabled in threaded mode."
         end
-        workspaces = _thread_workspaces(T, econ.n, num_inds, Threads.maxthreadid())
-
-        Threads.@threads :static for k in eachindex(firm_sel)
-            firm_idx = firm_sel[k]
-            workspace = workspaces[Threads.threadid()]
-            _default_shock!(workspace.psi, firm_idx)
-
-            values[firm_idx] = _compute_single_esri!(
-                econ,
-                workspace.current_upstream,
-                workspace.previous_upstream,
-                workspace.current_downstream,
-                workspace.previous_downstream,
-                workspace.sigmas,
-                workspace.essential_matrix,
-                workspace.temp_sums,
-                workspace.nonessential_vector,
-                workspace.psi,
-                weights;
-                combine = combine,
-                maxiter = maxiter,
-                tol = tol,
-                verbose = false,
-            )
+        tasks = map(firm_sel) do firm_idx
+            Threads.@spawn begin
+                value = _solve_default_firm_esri(econ, weights, firm_idx, combine, maxiter, tol)
+                return firm_idx, value
+            end
+        end
+        for task in tasks
+            firm_idx, value = fetch(task)
+            values[firm_idx] = value
         end
     else
-        workspace = _allocate_workspace(T, econ.n, num_inds)
         iter_range = verbose ? ProgressBar(firm_sel; total = length(firm_sel)) : firm_sel
 
         for firm_idx in iter_range
-            _default_shock!(workspace.psi, firm_idx)
-
-            values[firm_idx] = _compute_single_esri!(
-                econ,
-                workspace.current_upstream,
-                workspace.previous_upstream,
-                workspace.current_downstream,
-                workspace.previous_downstream,
-                workspace.sigmas,
-                workspace.essential_matrix,
-                workspace.temp_sums,
-                workspace.nonessential_vector,
-                workspace.psi,
-                weights;
-                combine = combine,
-                maxiter = maxiter,
-                tol = tol,
-                verbose = false,
-            )
+            values[firm_idx] = _solve_default_firm_esri(econ, weights, firm_idx, combine, maxiter, tol)
         end
     end
 
-    if econ.total_output > zero(T)
-        values ./= econ.total_output
-    end
     return values
 end
 
@@ -429,7 +417,7 @@ function esri(
     weights = _coerce_weights(final_weights, econ.row_sums)
     firm_sel = _firm_selection(n, firm_indices)
 
-    if firm_indices === nothing && _supports_degree_permutation(econ)
+    if firm_indices === nothing && !threads && _supports_degree_permutation(econ)
         perm = _degree_desc_permutation(econ)
         permuted_econ = _permute_sparse_economy(econ, perm)
         permuted_values = _economywide_esri(

@@ -4,7 +4,9 @@ Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix wi
 
 Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap vector `\psi \in [0,1]^N`.
 
-The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, firm `i` can operate at at most a `\psi_i` fraction of its baseline capacity. Thus:
+The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, firm `i` can operate at at most a `\psi_i` fraction of its normal capacity. This is the main way to describe a shock scenario in the package. You can use it for one closed firm, a partly constrained sector, or a wider event such as an energy shortage, sanctions, or a port disruption. ESRI then shows how that initial shock can move through supply chains and affect the wider economy.
+
+In simple language:
 
 - `\psi_i = 1` means no exogenous shock to firm `i`.
 - `\psi_i = 0` means firm `i` is fully closed.
@@ -12,7 +14,7 @@ The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, f
 
 If all entries of `\psi` are `1`, then no firm is exogenously shocked.
 
-The ESRI score of a firm as presented by Diem et al. is the total loss at a steady state where `\psi` is `1` for all indices except the index corresponding to that firm, where it is `0`. The `\psi` formulation allows for more general multi-firm and partial-capacity scenarios.
+The ESRI score of a firm as presented by Diem et al. is the total loss at a steady state where `\psi` is `1` for all indices except the index corresponding to that firm, where it is `0`. The `\psi` formulation lets you study more realistic cases too: more than one firm can be shocked at once, and the shock does not need to be all-or-nothing.
 
 Define firm output and input totals by
 

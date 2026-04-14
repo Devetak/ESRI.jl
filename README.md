@@ -2,15 +2,9 @@
 
 [![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://devetak.github.io/ESRI.jl/)
 
-`ESRI.jl` computes firm-level economic systemic risk on directed supply networks.
+`ESRI.jl` is a package for computing the Economic Systemic Risk Index for firms in an economy based on the paper by Diem et al.
 
-The package follows the ESRI setup of Diem et al. (2022) with a narrower input contract:
-
-- `W` is a square firm-to-firm weight matrix.
-- `IndustryInfo` uses one industry id per firm and one Boolean essentiality flag per industry.
-- `psi` is always a capacity-cap vector in `[0,1]^N`.
-
-Build `ESRIEconomy(W, info)` once and reuse it when the network is fixed.
+In this package, `psi[i]` means how much of its normal capacity firm `i` is allowed to use in the scenario you want to study. `psi[i] = 1.0` means normal operation, `psi[i] = 0.0` means the firm is shut down, and values in between mean the firm can still operate, but only partially. This lets you model shocks such as plant closures, energy shortages, sanctions, or transport disruptions and then measure how those shocks spread through the wider economy.
 
 ## Installation
 
@@ -19,28 +13,28 @@ using Pkg
 Pkg.add(url = "https://github.com/Devetak/ESRI.jl")
 ```
 
-For local development:
-
-```julia
-using Pkg
-Pkg.develop(path = "/path/to/ESRI.jl")
-```
-
 ## Quick start
 
 ```julia
 using ESRI, SparseArrays
-using LinearAlgebra: I
 
 N = 1_000
-W = sprand(N, N, 0.01) + 0.1I
-info = IndustryInfo(rand(1:5, N), [true, true, true, false, false])
+W = sprand(N, N, 0.01)
+W[1:N+1:end] .= 0
+info = IndustryInfo(rand(1:4, N), [true, true, false, false]) # industry 1 and 2 are essential
 
-econ = ESRIEconomy(W, info)
-scores = esri(econ; maxiter = 50, tol = 1e-3, threads = true)
-value = esri(econ, 10; maxiter = 50, tol = 1e-3)
-details = esri(econ, 10; maxiter = 50, tol = 1e-3, details = true)
+econ = ESRIEconomy(W, info) # set up the economy
+scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
+nothing
 ```
+
+Example score distribution from the same kind of run:
+
+![Histogram of example ESRI scores](docs/src/assets/scores_hist.svg)
+
+If most firms are near zero, most single-firm failures have limited economy-wide spillovers. If the histogram has a heavier right tail, some firm failures create much larger losses across the economy.
+
+Build `ESRIEconomy` once and reuse it on the same network.
 
 ## Key calls
 
@@ -49,13 +43,6 @@ details = esri(econ, 10; maxiter = 50, tol = 1e-3, details = true)
 - `esri_shock(econ, psi; ...)` solves one scenario from an explicit capacity cap vector `psi ∈ [0,1]^N`.
 - `final_weights` changes only the numerator of the final ESRI reduction.
 - `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. It does not add a second shock on top.
-
-## Docs
-
-- Source docs: `docs/src/`
-- Build locally:
-  - `julia --project=docs -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'`
-  - `julia --project=docs docs/make.jl`
 
 ## Reference benchmarks
 
@@ -71,24 +58,9 @@ Local reference runs from `2026-04-12` on `Apple M2`, with `JULIA_NUM_THREADS=1`
 Run with:
 
 ```bash
-julia --project benchmark/sparse_powerlaw_esri.jl 10000 truncated_tail
-julia --project benchmark/sparse_powerlaw_esri.jl 10000 heavy_tail
+julia --project test/perf_full_powerlaw_esri.jl 10000 truncated_tail
+julia --project test/perf_full_powerlaw_esri.jl 10000 heavy_tail
 ```
-
-Quick full-solve smoke benchmark:
-
-```bash
-julia --project test/perf_full_powerlaw_esri.jl
-```
-
-Larger manual references:
-
-```bash
-julia --project benchmark/sparse_powerlaw_esri.jl 50000 truncated_tail
-julia --project benchmark/sparse_powerlaw_esri.jl 50000 heavy_tail
-```
-
-These are local reference numbers, not CI guarantees.
 
 ## Reference
 

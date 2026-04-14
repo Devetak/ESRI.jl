@@ -3,24 +3,31 @@
 ## Economy-wide run
 
 ```@doctest
-using ESRI, SparseArrays, LinearAlgebra, Random
+using ESRI, SparseArrays, Random, Statistics
 Random.seed!(42)
 
-N = 30
-W = sprand(N, N, 0.1) + 0.1I
+N = 1_000
+W = sprand(N, N, 0.01)
+W[1:N+1:end] .= 0
 info = IndustryInfo(rand(1:3, N), [true, false, true])
 econ = ESRIEconomy(W, info)
 
 scores = esri(econ; maxiter = 30, tol = 1e-3, threads = false)
+nothing
 ```
+
+![Histogram of economy-wide ESRI scores](assets/scores_hist.svg)
 
 ## Single firm with full details
 
 ```@doctest
 res = esri(econ, 5; details = true, maxiter = 20, tol = 1e-3)
-typeof(res), length(res.upstream), length(res.downstream)
-# (ESRIResult{Float64}, 30, 30)
+(res.esri, length(res.upstream), length(res.downstream))
+# output
+(0.3400687234719314, 1000, 1000)
 ```
+
+This call is useful when you want the full scenario, not just one number. `res.upstream` and `res.downstream` show which firms lose production because inputs fail, which firms lose production because customers fail, and where the stress is strongest.
 
 ## Requested components only
 
@@ -32,21 +39,33 @@ down_only = esri(econ, 3; components = :downstream, maxiter = 25, tol = 1e-3)
 ## Custom final weights
 
 ```@doctest
-weights = rand(Float32, N) # for example number of employees
-scores_up = esri(econ; final_weights = weights, combine = :upstream, maxiter = 25, tol = 1e-3)
-length(scores_up), eltype(scores_up)
+output_weights = vec(sum(W; dims = 2))
+scores_output = esri(econ; final_weights = output_weights, maxiter = 25, tol = 1e-3)
+
+spike_weights = copy(output_weights)
+spike_weights[10] = 100.0
+scores_spike = esri(econ; final_weights = spike_weights, maxiter = 25, tol = 1e-3)
+
+(scores_output ≈ scores, round(mean(scores_spike) - mean(scores_output); digits = 4))
 # output
-(30, Float64)
+(true, 0.0009)
 ```
+
+![Comparison of baseline and spiked custom weights](assets/scores_custom_weights_compare.svg)
+
+Here `output_weights` are each firm's own baseline outputs, computed directly from the same `W`. That reproduces the default score distribution. After setting one firm's weight to `100`, the distribution changes, but it stays similar because only the final aggregation weights changed. The network dynamics and shock propagation are the same.
 
 ## Subset of default firm shocks
 
 ```@doctest
-subset_scores = esri(econ; firm_indices = [2, 6, 9], maxiter = 20, tol = 1e-3, threads = false)
-subset_scores[2] >= 0 && subset_scores[6] >= 0 && subset_scores[9] >= 0 && all(subset_scores[[1,3,4,5,7,8,10:end]] .== 0)
+subset_indices = collect(25:25:1_000)
+subset_scores = esri(econ; firm_indices = subset_indices, maxiter = 20, tol = 1e-3, threads = false)
+count(!iszero, subset_scores), round.(extrema(subset_scores[subset_scores .> 0]); digits = 3)
 # output
-true
+(40, (0.006, 0.059))
 ```
+
+![Histogram of selected-shock scores](assets/subset_scores_hist.svg)
 
 ## Custom shock vector
 
@@ -59,8 +78,13 @@ psi[4] = 0.5
 psi[5] = 0.8
 
 # Here psi[i] is firm i's exogenous capacity cap:
-# 1.0 = unaffected, 0.0 = closed, values in between = partial capacity.
+# 1.0 = normal operation, 0.0 = shut down, values in between = partial capacity.
+# This is how you encode real-world shocks such as plant closures, transport bottlenecks,
+# sanctions, or energy shortages before asking how they spread through the whole economy.
 scenario = esri_shock(econ, psi; details = true, maxiter = 25, tol = 1e-3)
+(scenario.esri, round.(scenario.upstream[1:3]; digits = 3), round.(scenario.downstream[1:3]; digits = 3))
+# output
+(0.31872022292698855, [0.0, 0.0, 0.5], [0.0, 0.0, 0.5])
 ```
 
 ## Single-firm call with explicit shock

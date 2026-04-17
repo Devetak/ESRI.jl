@@ -1,12 +1,12 @@
 using Documenter
-using ESRI
+using ESRIcascade
 
-DocMeta.setdocmeta!(ESRI, :DocTestSetup, :(using ESRI, SparseArrays, LinearAlgebra, Random); recursive = true)
+DocMeta.setdocmeta!(ESRIcascade, :DocTestSetup, :(using ESRIcascade, SparseArrays, LinearAlgebra, Random); recursive = true)
 
 makedocs(
-    modules = [ESRI],
-    sitename = "ESRI.jl",
     format = Documenter.HTML(edit_link = nothing),
+    modules = [ESRIcascade],
+    sitename = "ESRIcascade.jl",
     checkdocs = :exports,
     doctest = true,
     pages = [
@@ -19,10 +19,9 @@ makedocs(
     ],
 )
 
-if !isempty(get(ENV, "DOCUMENTER_KEY", ""))
+if haskey(ENV, "DOCUMENTER_KEY")
     deploydocs(
-        repo = "github.com/Devetak/ESRI.jl.git",
+        repo = "github.com/Devetak/ESRIcascade.jl.git",
         devbranch = "main",
-        push_preview = true,
     )
 end

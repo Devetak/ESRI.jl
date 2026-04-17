@@ -1,4 +1,4 @@
-using ESRI
+using ESRIcascade
 using Random
 using SparseArrays
 using SparseMatricesCSR
@@ -15,7 +15,7 @@ function old_sparse_downstream_builder(
     essential_vals = zeros(T, length(vals))
     nonessential_vals = zeros(T, length(vals))
 
-    num_inds = ESRI.num_industries(info)
+    num_inds = ESRIcascade.num_industries(info)
     essential_by_industry = zeros(T, num_inds)
 
     @inbounds for col = 1:ncols
@@ -31,16 +31,16 @@ function old_sparse_downstream_builder(
             row = rows[idx]
             val = vals[idx]
             all_suppliers_total += val
-            if ESRI.is_essential(info, row)
-                essential_by_industry[ESRI.get_industry(info, row)] += val
+            if ESRIcascade.is_essential(info, row)
+                essential_by_industry[ESRIcascade.get_industry(info, row)] += val
             end
         end
 
         for idx = start_idx:stop_idx
             row = rows[idx]
             val = vals[idx]
-            if ESRI.is_essential(info, row)
-                denom = essential_by_industry[ESRI.get_industry(info, row)]
+            if ESRIcascade.is_essential(info, row)
+                denom = essential_by_industry[ESRIcascade.get_industry(info, row)]
                 essential_vals[idx] = denom == 0 ? zero(T) : val / denom
             else
                 nonessential_vals[idx] = all_suppliers_total == 0 ? zero(T) : val / all_suppliers_total
@@ -77,7 +77,7 @@ function main()
     info = IndustryInfo(rand(1:inds, n), rand(Bool, inds))
 
     old_call = () -> old_sparse_downstream_builder(W, info)
-    new_call = () -> ESRI.compute_downstream_impact_matrices(W, info)
+    new_call = () -> ESRIcascade.compute_downstream_impact_matrices(W, info)
 
     old_ess, old_non = old_call()
     new_ess, new_non = new_call()

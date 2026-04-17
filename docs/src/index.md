@@ -1,24 +1,18 @@
-# ESRI.jl
+# ESRIcascade.jl
 
-`ESRI.jl` is a package for computing the Economic Systemic Risk Index for firms in an economy.
-
-Inputs are a square weight matrix `W` representing the supply chain, one industry id per firm, and one Boolean essentiality flag per industry.
-
-`ESRIEconomy(W, info)` caches the operators and weights for further reuse. `esri(econ; ...)` computes the default single-firm closures. `esri_shock(econ, psi; ...)` computes one explicit scenario from a firm-level capacity-cap vector `psi`, where `1` means unaffected and `0` means closed.
-
-In simple terms, `psi[i]` says how much of its normal capacity firm `i` is allowed to use in the scenario you want to study. Use it to describe shocks like a plant shutdown, an energy shortage, a port disruption, sanctions, or a sector-wide restriction. ESRI then shows how that local shock can spread through suppliers and customers across the wider economy.
+`ESRIcascade.jl` computes firm-level economic systemic risk indicators from an input-output network.
 
 ## Installation
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/Devetak/ESRI.jl")
+Pkg.add(url = "https://github.com/Devetak/ESRIcascade.jl")
 ```
 
 ## Quick start
 
 ```@doctest
-using ESRI, SparseArrays
+using ESRIcascade, SparseArrays, LinearAlgebra
 
 N = 1_000
 W = sprand(N, N, 0.01)

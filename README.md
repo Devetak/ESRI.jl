@@ -1,8 +1,10 @@
-# ESRI.jl
+# ESRIcascade.jl
 
 [![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://devetak.github.io/ESRI.jl/)
 
-`ESRI.jl` is a package for computing the Economic Systemic Risk Index for firms in an economy based on the paper by Diem et al.
+ESRIcascade.jl computes, for each firm, the share of the economy that depends on that firm in `[0, 1]`.
+
+`ESRIcascade.jl` is a package for computing the Economic Systemic Risk Index for firms in an economy based on the paper by Diem et al.
 
 In this package, `psi[i]` means how much of its normal capacity firm `i` is allowed to use in the scenario you want to study. `psi[i] = 1.0` means normal operation, `psi[i] = 0.0` means the firm is shut down, and values in between mean the firm can still operate, but only partially. This lets you model shocks such as plant closures, energy shortages, sanctions, or transport disruptions and then measure how those shocks spread through the wider economy.
 
@@ -10,13 +12,28 @@ In this package, `psi[i]` means how much of its normal capacity firm `i` is allo
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/Devetak/ESRI.jl")
+Pkg.add(url = "https://github.com/Devetak/ESRIcascade.jl")
 ```
 
-## Quick start
+After registration in the General registry:
 
 ```julia
-using ESRI, SparseArrays
+using Pkg
+Pkg.add("ESRIcascade")
+```
+
+For local development:
+
+```julia
+using Pkg
+Pkg.develop(path = "/path/to/ESRIcascade.jl")
+```
+
+## Quick start (sparse only)
+
+```julia
+using ESRIcascade, SparseArrays
+using LinearAlgebra: I
 
 N = 1_000
 W = sprand(N, N, 0.01)
@@ -68,4 +85,4 @@ Diem, C. et al. *Quantifying firm-level economic systemic risk from nation-wide 
 
 ## License
 
-MIT. See `LICENSE`.
+ESRIcascade.jl is open source and released under the MIT License. See `LICENSE` for details.

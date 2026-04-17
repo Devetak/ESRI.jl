@@ -3,7 +3,7 @@
     essential_industry = [true, false]
     info = IndustryInfo(industry_ids, essential_industry)
 
-    @test ESRI.num_industries(info) == 2
+    @test ESRIcascade.num_industries(info) == 2
     @test info.industry_of_firm == industry_ids
     @test info.essential_industry == essential_industry
     @test info.essential_firm == [true, false, true, false]
@@ -15,9 +15,9 @@
 end
 
 @testset "Internal helper functions" begin
-    @test ESRI._firm_selection(5, nothing) == [1, 2, 3, 4, 5]
-    @test ESRI._firm_selection(5, [5, 2, 3]) == [5, 2, 3]
-    @test_throws BoundsError ESRI._firm_selection(5, [0, 1])
-    @test_throws ArgumentError ESRI._firm_selection(5, [1, 1])
-    @test ESRI._linf_distance([1.0, 2.0, 3.0], [1.5, 1.0, 2.5]) == 1.0
+    @test ESRIcascade._firm_selection(5, nothing) == [1, 2, 3, 4, 5]
+    @test ESRIcascade._firm_selection(5, [5, 2, 3]) == [5, 2, 3]
+    @test_throws BoundsError ESRIcascade._firm_selection(5, [0, 1])
+    @test_throws ArgumentError ESRIcascade._firm_selection(5, [1, 1])
+    @test ESRIcascade._linf_distance([1.0, 2.0, 3.0], [1.5, 1.0, 2.5]) == 1.0
 end

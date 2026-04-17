@@ -1,3 +1,19 @@
+using Test
+using ESRIcascade
+using SparseArrays
+
+function deterministic_fixture()
+    # 3-firm hand-solvable network:
+    # firm 1 supplies firms 1 and 2; firm 2 self-supplies; firm 3 isolated self-supply.
+    W = [
+        1.0 1.0 0.0
+        0.0 1.0 0.0
+        0.0 0.0 1.0
+    ]
+    info = IndustryInfo([1, 1, 1], [true])
+    return W, info
+end
+
 @testset "Custom weights and combine modes" begin
     W, info = deterministic_fixture()
     econ = ESRIEconomy(W, info)

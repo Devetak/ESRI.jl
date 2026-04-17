@@ -1,7 +1,7 @@
 using Test
 using Aqua
-using ESRI
+using ESRIcascade
 
 @testset "Aqua quality checks" begin
-    Aqua.test_all(ESRI; ambiguities = false)
+    Aqua.test_all(ESRIcascade; ambiguities = false)
 end

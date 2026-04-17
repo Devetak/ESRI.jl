@@ -1,4 +1,4 @@
-using ESRI
+using ESRIcascade
 using Random
 using Statistics
 
@@ -58,7 +58,7 @@ function main()
 
     W = rand(n, n)
     info = IndustryInfo(rand(1:num_industries, n), rand(Bool, num_industries))
-    essential_impact, nonessential_impact = ESRI.compute_downstream_impact_matrices(W, info)
+    essential_impact, nonessential_impact = ESRIcascade.compute_downstream_impact_matrices(W, info)
 
     downstream = rand(n)
     sigmas_base = rand(n)
@@ -84,7 +84,7 @@ function main()
 
     new_call! = () -> begin
         copyto!(sigmas, sigmas_base)
-        ESRI._accumulate_downstream_components!(
+        ESRIcascade._accumulate_downstream_components!(
             em_new,
             nv_new,
             downstream,

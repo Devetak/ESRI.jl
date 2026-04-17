@@ -3,7 +3,7 @@ using Random
 using SparseArrays
 using LinearAlgebra: I, BLAS
 
-using ESRI
+using ESRIcascade
 
 include("test_helpers.jl")
 include("test_types.jl")

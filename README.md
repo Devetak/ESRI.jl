@@ -63,21 +63,23 @@ Build `ESRIEconomy` once and reuse it on the same network.
 
 ## Reference benchmarks
 
-Local reference runs from `2026-04-12` on `Apple M2`, with `JULIA_NUM_THREADS=1`, `mean_degree=7`, `alpha=2.3`, `nindustries=50`, and `maxiter=30`. These timings call full `esri(econ; ...)` over all firms.
+Use the native comparison harness to benchmark `ESRIcascade` and the subset of Diem's bundled `fastcascade` C++ implementation that matches this package's supported setup: one global essential/non-essential sector split, no substitution, and default single-firm shock scenarios on the same sparse power-law network.
 
-| mode | firms | nnz | max_degree | p99_degree | top1pct_edge_share | build_s | solve_s |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `truncated_tail` | 5_000 | 35_000 | 111 | 25 | 0.0637 | 0.0312 | 6.5329 |
-| `heavy_tail` | 5_000 | 35_000 | 385 | 26 | 0.0928 | 0.0020 | 5.7411 |
-| `truncated_tail` | 10_000 | 70_000 | 128 | 24 | 0.0616 | 0.0388 | 26.6213 |
-| `heavy_tail` | 10_000 | 70_000 | 964 | 25 | 0.1071 | 0.0334 | 26.4600 |
+| firms | nnz | max_degree | p99_degree | top1pct_edge_share | esri_build_s | esri_solve_s | diem_total_s | esri_total_speedup_x |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `10_000` | run `benchmark/compare_fastcascade.jl` | | | | | | | |
+| `50_000` | run `benchmark/compare_fastcascade.jl` | | | | | | | |
+| `100_000` | run `benchmark/compare_fastcascade.jl` | | | | | | | |
 
 Run with:
 
 ```bash
-julia --project test/perf_full_powerlaw_esri.jl 10000 truncated_tail
-julia --project test/perf_full_powerlaw_esri.jl 10000 heavy_tail
+julia --project=. test/perf_full_powerlaw_esri.jl 1000
+julia --project=. benchmark/compare_fastcascade.jl 1000
+julia --project=. benchmark/compare_fastcascade.jl 10000 50000 100000
 ```
+
+The `test/perf_full_powerlaw_esri.jl` command is a quick ESRIcascade-only smoke check. The `benchmark/compare_fastcascade.jl` command generates one shared sparse power-law network per requested size, runs both implementations on that exact input, and prints a Markdown table you can paste back into the README.
 
 ## Reference
 

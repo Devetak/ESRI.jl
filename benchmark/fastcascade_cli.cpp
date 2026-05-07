@@ -203,8 +203,8 @@ arma::mat fastcascade_esri(
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 6) {
-        std::cerr << "usage: fastcascade_cli <edges.tsv> <industries.tsv> <essential.tsv> <tol> <output.tsv>\n";
+    if (argc != 7) {
+        std::cerr << "usage: fastcascade_cli <edges.tsv> <industries.tsv> <essential.tsv> <tol> <metrics.tsv> <scores.tsv>\n";
         return 1;
     }
 
@@ -212,7 +212,8 @@ int main(int argc, char** argv) {
     const std::string industries_path = argv[2];
     const std::string essential_path = argv[3];
     const double tol = std::stod(argv[4]);
-    const std::string output_path = argv[5];
+    const std::string metrics_path = argv[5];
+    const std::string scores_path = argv[6];
 
     arma::uvec p_cons = read_uvec_1based(industries_path);
     arma::uvec essential_flags = read_uvec_raw(essential_path);
@@ -251,12 +252,26 @@ int main(int argc, char** argv) {
     const auto end = std::chrono::steady_clock::now();
     const double elapsed = std::chrono::duration<double>(end - start).count();
 
-    std::ofstream out(output_path);
-    if (!out) {
-        throw std::runtime_error("failed to open " + output_path);
+    std::ofstream metrics_out(metrics_path);
+    if (!metrics_out) {
+        throw std::runtime_error("failed to open " + metrics_path);
     }
-    out << "diem_total_s\t" << elapsed << "\n";
-    out << "diem_score_min\t" << ESRI.col(0).min() << "\n";
-    out << "diem_score_max\t" << ESRI.col(0).max() << "\n";
+    metrics_out << "diem_total_s\t" << elapsed << "\n";
+    metrics_out << "diem_score_min\t" << ESRI.col(0).min() << "\n";
+    metrics_out << "diem_score_max\t" << ESRI.col(0).max() << "\n";
+    metrics_out << "diem_downstream_score_min\t" << ESRI.col(1).min() << "\n";
+    metrics_out << "diem_downstream_score_max\t" << ESRI.col(1).max() << "\n";
+    metrics_out << "diem_upstream_score_min\t" << ESRI.col(2).min() << "\n";
+    metrics_out << "diem_upstream_score_max\t" << ESRI.col(2).max() << "\n";
+
+    std::ofstream scores_out(scores_path);
+    if (!scores_out) {
+        throw std::runtime_error("failed to open " + scores_path);
+    }
+    for (arma::uword scenario = 0; scenario < ESRI.n_rows; ++scenario) {
+        scores_out << ESRI(scenario, 0) << '\t'
+                   << ESRI(scenario, 1) << '\t'
+                   << ESRI(scenario, 2) << "\n";
+    }
     return 0;
 }

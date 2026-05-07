@@ -3,12 +3,14 @@ using Random
 using SparseArrays
 using Statistics
 
+_default_max_degree(n::Int) = min(max(n - 1, 1), 128)
+
 function sample_powerlaw_degree(
     rng,
     n;
     mean_degree::Int = 7,
     alpha::Float64 = 2.3,
-    max_degree::Int = min(n, 128),
+    max_degree::Int = _default_max_degree(n),
 )
     ks = collect(1:max_degree)
     cdf = cumsum(ks .^ (-alpha))
@@ -39,6 +41,7 @@ function sample_powerlaw_degree(
 end
 
 function sample_unique_customers!(rng, customers::Vector{Int}, seen::Vector{Int}, stamp::Int, k::Int, n::Int)
+    seen[stamp] = stamp
     i = 1
     while i <= k
         customer = rand(rng, 1:n)
@@ -57,7 +60,7 @@ function sparse_powerlaw_network(
     n;
     mean_degree::Int = 7,
     alpha::Float64 = 2.3,
-    max_degree::Int = min(n, 128),
+    max_degree::Int = _default_max_degree(n),
 )
     deg = sample_powerlaw_degree(rng, n; mean_degree = mean_degree, alpha = alpha, max_degree = max_degree)
     rows = Int[]
@@ -99,7 +102,7 @@ function generate_benchmark_input(
     mean_degree::Int = 7,
     alpha::Float64 = 2.3,
     nindustries::Int = 50,
-    max_degree::Int = min(n, 128),
+    max_degree::Int = _default_max_degree(n),
 )
     rng = MersenneTwister(seed)
     W, deg = sparse_powerlaw_network(rng, n; mean_degree = mean_degree, alpha = alpha, max_degree = max_degree)
@@ -113,10 +116,11 @@ function benchmark_once(
     mean_degree::Int = 7,
     alpha::Float64 = 2.3,
     nindustries::Int = 50,
-    max_degree::Int = min(n, 128),
+    max_degree::Int = _default_max_degree(n),
     maxiter::Int = 30,
     tol::Float64 = 1e-3,
     threaded::Bool = Threads.nthreads() > 1,
+    combine::Symbol = :min,
 )
     W, info, deg = generate_benchmark_input(
         n;
@@ -127,7 +131,7 @@ function benchmark_once(
         max_degree = max_degree,
     )
     build_s = @elapsed econ = ESRIEconomy(W, info)
-    solve_s = @elapsed scores = esri(econ; maxiter = maxiter, tol = tol, threads = threaded)
+    solve_s = @elapsed scores = esri(econ; maxiter = maxiter, tol = tol, threads = threaded, combine = combine)
 
     return (
         threads = Threads.nthreads(),
@@ -139,8 +143,10 @@ function benchmark_once(
         p99_degree = p99_degree(deg),
         top1pct_edge_share = top1pct_edge_share(deg),
         alpha = alpha,
+        combine = combine,
         build_s = build_s,
         solve_s = solve_s,
+        scores = scores,
         score_range = extrema(scores),
         W = W,
         info = info,

@@ -1,6 +1,6 @@
 # ESRIcascade.jl
 
-[![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://devetak.github.io/ESRI.jl/)
+[![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://devetak.github.io/ESRIcascade.jl/)
 
 ESRIcascade.jl computes, for each firm, the share of the economy that depends on that firm in `[0, 1]`.
 

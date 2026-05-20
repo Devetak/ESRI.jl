@@ -39,7 +39,7 @@ This package makes ESRI available through a tested Julia API and exposes scenari
 
 # State of the field
 
-[PETER KLIMEK]
+[Why Firm-Level Networks? Why ESRI? Why relevant? history?]
 
 Computationally, economy-wide ESRI is expensive because one fixed-point cascade must be solved for each candidate firm. Repeated scenario evaluation therefore becomes the main bottleneck in reconstruction studies, sensitivity analysis, and comparisons across alternative networks. ESRIcascade.jl addresses this bottleneck as software engineering work around an existing method, not as a change to the ESRI definition.
 

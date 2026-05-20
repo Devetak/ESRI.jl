@@ -58,7 +58,7 @@ Build `ESRIEconomy` once and reuse it on the same network.
 - `esri(econ; ...)` computes the default single-firm closure for each selected firm. If `firm_indices` is set, unrequested entries stay zero.
 - `esri(econ, firm_idx; ...)` solves one scenario and returns a scalar, a named tuple, or `ESRIResult`.
 - `esri_shock(econ, psi; ...)` solves one scenario from an explicit capacity cap vector `psi ∈ [0,1]^N`.
-- `final_weights` changes only the numerator of the final ESRI reduction.
+- `final_weights` replaces the weights in the final ESRI reduction. With custom weights, the scalar is the weighted loss divided by `sum(final_weights)`.
 - `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. It does not add a second shock on top.
 
 ## Reference benchmarks

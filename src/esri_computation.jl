@@ -202,6 +202,11 @@ function _normalize_esri(value::T, econ::ESRIEconomy{T}) where {T}
     return econ.total_output > zero(T) ? value / econ.total_output : value
 end
 
+function _normalize_esri(value::T, final_weights::AbstractVector{T}) where {T}
+    denominator = sum(final_weights)
+    return denominator > zero(T) ? value / denominator : value
+end
+
 function _package_result(
     components::Symbol,
     esri_value,
@@ -318,7 +323,7 @@ function _solve_default_firm_esri(
         tol = tol,
         verbose = false,
     )
-    return _normalize_esri(value, econ)
+    return _normalize_esri(value, final_weights)
 end
 
 function _economywide_esri(
@@ -388,7 +393,7 @@ function _run_scenario!(
     )
     return _package_result(
         components,
-        _normalize_esri(value, econ),
+        _normalize_esri(value, final_weights),
         workspace.current_upstream,
         workspace.current_downstream,
     )
@@ -399,8 +404,8 @@ end
          firm_indices=nothing, final_weights=nothing, combine=:min)
 
 Compute one default firm shock per selected firm and return one ESRI value per firm.
-Entries outside `firm_indices` stay zero. `final_weights` changes only the numerator,
-and `combine` picks `min(upstream, downstream)`, `upstream`, or `downstream`.
+Entries outside `firm_indices` stay zero. `final_weights` replaces the final reduction
+weights, and `combine` picks `min(upstream, downstream)`, `upstream`, or `downstream`.
 """
 function esri(
     econ::ESRIEconomy{T};

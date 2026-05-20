@@ -172,6 +172,8 @@ Let `w_i` be the final weights. The package default is `w_i = r_i`. The reported
 
 If `\sum_i r_i = 0`, the package returns the unnormalized numerator.
 
+With the default `w_i = r_i`, this is a share of total output. If custom `final_weights` are supplied, the denominator becomes `\sum_i w_i`, so the scalar is a weighted average loss under those weights.
+
 ## Relation to the paper
 
 The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022). We allow for general shock scenarios via `\psi`.

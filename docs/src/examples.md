@@ -55,6 +55,8 @@ scores_spike = esri(econ; final_weights = spike_weights, maxiter = 25, tol = 1e-
 
 Here `output_weights` are each firm's own baseline outputs, computed directly from the same `W`. That reproduces the default score distribution. After setting one firm's weight to `100`, the distribution changes, but it stays similar because only the final aggregation weights changed. The network dynamics and shock propagation are the same.
 
+The default score is normalized as a share of total output. With custom `final_weights`, the denominator is `sum(final_weights)`, so the result is a weighted average loss under those weights.
+
 ## Subset of default firm shocks
 
 ```@doctest

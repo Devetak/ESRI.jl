@@ -30,7 +30,7 @@
 
 `combine=:min` uses `min(upstream, downstream)` in the final reduction. `:upstream` and `:downstream` use that channel alone.
 
-`final_weights` replaces the default output weights only in the numerator. The denominator stays `sum(row_sums)`.
+`final_weights` replaces the default output weights in the final reduction. With the default weights, the scalar is a share of total output. With custom weights, the scalar is the weighted loss divided by `sum(final_weights)`.
 
 `verbose=true` prints iteration logs for single-scenario calls. In threaded economy-wide runs it is ignored with a warning.
 

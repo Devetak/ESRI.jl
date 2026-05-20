@@ -99,7 +99,7 @@ end
     @test d.esri == 0.0
     @test d.upstream == [1.0, 0.0, 1.0, 1.0]
     @test d.downstream == [1.0, 0.0, 1.0, 1.0]
-    @test esri(econ0, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 1.0
+    @test esri(econ0, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 0.25
 
     econ0_sparse = ESRIEconomy(spzeros(4, 4), IndustryInfo([1, 2, 1, 2], [true, false]))
     @test econ0_sparse.total_output == 0.0
@@ -108,7 +108,7 @@ end
     @test d_sparse.esri == 0.0
     @test d_sparse.upstream == [1.0, 0.0, 1.0, 1.0]
     @test d_sparse.downstream == [1.0, 0.0, 1.0, 1.0]
-    @test esri(econ0_sparse, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 1.0
+    @test esri(econ0_sparse, 2; final_weights = ones(4), maxiter = 20, tol = 1e-6) == 0.25
 end
 
 @testset "Validation and logging" begin

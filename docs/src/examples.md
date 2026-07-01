@@ -3,7 +3,7 @@
 ## Economy-wide run
 
 ```@doctest
-using ESRIcascade, SparseArrays, LinearAlgebra, Random
+using ESRIcascade, SparseArrays, Random, Statistics
 Random.seed!(42)
 
 N = 1_000

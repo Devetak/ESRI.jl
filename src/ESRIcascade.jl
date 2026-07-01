@@ -1,6 +1,5 @@
 module ESRIcascade
 
-using LinearAlgebra
 using SparseArrays
 using SparseMatricesCSR
 using ProgressBars

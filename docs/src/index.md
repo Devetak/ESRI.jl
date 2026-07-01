@@ -6,13 +6,13 @@
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/Devetak/ESRIcascade.jl")
+Pkg.add("ESRIcascade")
 ```
 
 ## Quick start
 
 ```@doctest
-using ESRIcascade, SparseArrays, LinearAlgebra
+using ESRIcascade, SparseArrays
 
 N = 1_000
 W = sprand(N, N, 0.01)

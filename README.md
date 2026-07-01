@@ -12,13 +12,6 @@ In this package, `psi[i]` means how much of its normal capacity firm `i` is allo
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/Devetak/ESRIcascade.jl")
-```
-
-After registration in the General registry:
-
-```julia
-using Pkg
 Pkg.add("ESRIcascade")
 ```
 
@@ -33,7 +26,6 @@ Pkg.develop(path = "/path/to/ESRIcascade.jl")
 
 ```julia
 using ESRIcascade, SparseArrays
-using LinearAlgebra: I
 
 N = 1_000
 W = sprand(N, N, 0.01)
@@ -75,8 +67,8 @@ Local reference runs from `2026-04-12` on `Apple M2`, with `JULIA_NUM_THREADS=1`
 Run with:
 
 ```bash
-julia --project test/perf_full_powerlaw_esri.jl 10000 truncated_tail
-julia --project test/perf_full_powerlaw_esri.jl 10000 heavy_tail
+julia --project=. test/perf_full_powerlaw_esri.jl 10000 truncated_tail
+julia --project=. test/perf_full_powerlaw_esri.jl 10000 heavy_tail
 ```
 
 ## Reference

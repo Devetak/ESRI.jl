@@ -108,14 +108,14 @@ function reference_lockstep_scenario(
     combine::Symbol = :min,
     shock::Union{Nothing,AbstractVector{<:Real}} = nothing,
 ) where {T}
-    workspace = ESRI._allocate_workspace(T, econ.n, ESRI.num_industries(econ.info))
-    ESRI._prepare_shock!(workspace.psi, firm_idx, shock)
+    workspace = ESRIcascade._allocate_workspace(T, econ.n, ESRIcascade.num_industries(econ.info))
+    ESRIcascade._prepare_shock!(workspace.psi, firm_idx, shock)
     fill!(workspace.previous_upstream, one(T))
     fill!(workspace.previous_downstream, one(T))
 
     for _ in 1:maxiter
         copyto!(workspace.current_downstream, workspace.previous_downstream)
-        ESRI.downstream_shock!(
+        ESRIcascade.downstream_shock!(
             econ.downstream_impact_essential,
             econ.downstream_impact_nonessential,
             econ.info,
@@ -127,7 +127,7 @@ function reference_lockstep_scenario(
             workspace.current_downstream,
             workspace.temp_sums,
         )
-        ESRI.upstream_step!(
+        ESRIcascade.upstream_step!(
             workspace.current_upstream,
             econ.upstream_impact,
             workspace.previous_upstream,
@@ -136,8 +136,8 @@ function reference_lockstep_scenario(
         )
 
         distance = max(
-            ESRI._linf_distance(workspace.current_upstream, workspace.previous_upstream),
-            ESRI._linf_distance(workspace.current_downstream, workspace.previous_downstream),
+            ESRIcascade._linf_distance(workspace.current_upstream, workspace.previous_upstream),
+            ESRIcascade._linf_distance(workspace.current_downstream, workspace.previous_downstream),
         )
         if distance < tol
             break
@@ -146,9 +146,9 @@ function reference_lockstep_scenario(
         copyto!(workspace.previous_downstream, workspace.current_downstream)
     end
 
-    value = ESRI._reduce_esri(workspace.current_upstream, workspace.current_downstream, econ.row_sums, combine)
+    value = ESRIcascade._reduce_esri(workspace.current_upstream, workspace.current_downstream, econ.row_sums, combine)
     return (
-        esri = ESRI._normalize_esri(value, econ),
+        esri = ESRIcascade._normalize_esri(value, econ),
         upstream = copy(workspace.current_upstream),
         downstream = copy(workspace.current_downstream),
     )

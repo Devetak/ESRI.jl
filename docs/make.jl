@@ -1,7 +1,7 @@
 using Documenter
 using ESRIcascade
 
-DocMeta.setdocmeta!(ESRIcascade, :DocTestSetup, :(using ESRIcascade, SparseArrays, LinearAlgebra, Random); recursive = true)
+DocMeta.setdocmeta!(ESRIcascade, :DocTestSetup, :(using ESRIcascade, SparseArrays, Random, Statistics); recursive = true)
 
 makedocs(
     format = Documenter.HTML(edit_link = nothing),

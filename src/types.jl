@@ -39,7 +39,7 @@ end
 """
     IndustryInfo(industry_of_firm::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})
 
-Build immutable industry metadata for ESRI.
+Build immutable industry metadata.
 `industry_of_firm[i]` is the 1-based industry id of firm `i`.
 `essential_industry[k]` marks whether industry `k` is essential.
 """

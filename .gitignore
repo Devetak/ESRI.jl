@@ -84,4 +84,8 @@ esris.txt
 Economic-Systemic-Risk/
 script.jl
 benchmark/
+!benchmark/
+!benchmark/sparse_powerlaw_esri.jl
+!benchmark/compare_fastcascade.jl
+!benchmark/fastcascade_runner.R
 paper/

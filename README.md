@@ -64,6 +64,13 @@ Local reference runs from `2026-04-12` on `Apple M2`, with `JULIA_NUM_THREADS=1`
 | `truncated_tail` | 10_000 | 70_000 | 128 | 24 | 0.0616 | 0.0388 | 26.6213 |
 | `heavy_tail` | 10_000 | 70_000 | 964 | 25 | 0.1071 | 0.0334 | 26.4600 |
 
+Run with:
+
+```bash
+julia --project=. test/perf_full_powerlaw_esri.jl 10000 truncated_tail
+julia --project=. test/perf_full_powerlaw_esri.jl 10000 heavy_tail
+```
+
 ## Reference
 
 Diem, C. et al. *Quantifying firm-level economic systemic risk from nation-wide supply networks* (Scientific Reports, 2022): https://www.nature.com/articles/s41598-022-11522-z

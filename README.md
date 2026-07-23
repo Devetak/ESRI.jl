@@ -45,6 +45,8 @@ scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
 nothing
 ```
 
+If every input is essential, omit the classification: `IndustryInfo(rand(1:4, N))`.
+
 For customer-specific input requirements, pass a `0`/`1`/`2` matrix instead. Rows
 are supplier industries and columns are customer industries: `2` is essential, `1`
 is non-essential, and `0` has no downstream production effect (but remains in the
@@ -54,6 +56,27 @@ same classification for every customer industry.
 ```julia
 input_classification = [2 1 0; 0 2 1; 1 0 2]
 info = IndustryInfo(rand(1:3, N), input_classification)
+```
+
+CSV loading stays with the caller; for a numeric, header-free CSV, Julia's standard
+library is enough:
+
+```julia
+using DelimitedFiles
+input_classification = readdlm("input_classification.csv", ',', Int)
+info = IndustryInfo(industry_of_firm, input_classification)
+```
+
+For a labeled matrix such as `EssMatIHS.csv`, retain the industry-code order when
+mapping firm data to one-based ids, then remove the labels before construction:
+
+```julia
+raw = readdlm("EssMatIHS.csv", ',', String)
+industry_codes = raw[1, 2:end]
+@assert raw[2:end, 1] == industry_codes
+input_classification = parse.(UInt8, raw[2:end, 2:end])
+industry_id = Dict(code => i for (i, code) in pairs(industry_codes))
+info = IndustryInfo([industry_id[code] for code in firm_industry_codes], input_classification)
 ```
 
 Example score distribution from the same kind of run:

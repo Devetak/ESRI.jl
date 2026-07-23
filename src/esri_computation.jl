@@ -165,6 +165,7 @@ struct _ESRIWorkspace{T}
     previous_downstream::Vector{T}
     sigmas::Vector{T}
     essential_matrix::Matrix{T}
+    essential_touched::Vector{Int}
     temp_sums::Vector{T}
     nonessential_vector::Vector{T}
     psi::Vector{T}
@@ -177,7 +178,8 @@ function _allocate_workspace(::Type{T}, n::Int, num_inds::Int) where {T}
         Vector{T}(undef, n),
         Vector{T}(undef, n),
         Vector{T}(undef, n),
-        Matrix{T}(undef, n, num_inds),
+        zeros(T, n, num_inds),
+        Int[],
         Vector{T}(undef, num_inds),
         Vector{T}(undef, n),
         Vector{T}(undef, n),
@@ -236,6 +238,7 @@ function _compute_single_esri!(
     previous_downstream::Vector{T},
     sigmas::Vector{T},
     essential_matrix::Matrix{T},
+    essential_touched::Vector{Int},
     temp_sums::Vector{T},
     nonessential_vector::Vector{T},
     psi::Vector{T},
@@ -266,6 +269,7 @@ function _compute_single_esri!(
                 nonessential_vector,
                 current_downstream,
                 temp_sums,
+                essential_touched,
             )
             downstream_distance = _linf_distance(current_downstream, previous_downstream)
         end
@@ -296,15 +300,15 @@ function _compute_single_esri!(
     return _reduce_esri(current_upstream, current_downstream, final_weights, combine)
 end
 
-function _solve_default_firm_esri(
+function _solve_default_firm_esri!(
     econ::ESRIEconomy{T},
+    workspace::_ESRIWorkspace{T},
     final_weights::AbstractVector{T},
     firm_idx::Integer,
     combine::Symbol,
     maxiter::Int,
     tol::Real,
 ) where {T}
-    workspace = _allocate_workspace(T, econ.n, num_industries(econ.info))
     _default_shock!(workspace.psi, firm_idx)
     value = _compute_single_esri!(
         econ,
@@ -314,6 +318,7 @@ function _solve_default_firm_esri(
         workspace.previous_downstream,
         workspace.sigmas,
         workspace.essential_matrix,
+        workspace.essential_touched,
         workspace.temp_sums,
         workspace.nonessential_vector,
         workspace.psi,
@@ -324,6 +329,26 @@ function _solve_default_firm_esri(
         verbose = false,
     )
     return _normalize_esri(value, final_weights)
+end
+
+function _solve_default_firm_esri(
+    econ::ESRIEconomy{T},
+    final_weights::AbstractVector{T},
+    firm_idx::Integer,
+    combine::Symbol,
+    maxiter::Int,
+    tol::Real,
+) where {T}
+    workspace = _allocate_workspace(T, econ.n, num_industries(econ.info))
+    return _solve_default_firm_esri!(
+        econ,
+        workspace,
+        final_weights,
+        firm_idx,
+        combine,
+        maxiter,
+        tol,
+    )
 end
 
 function _economywide_esri(
@@ -337,6 +362,7 @@ function _economywide_esri(
     tol::Real,
 ) where {T}
     values = zeros(T, econ.n)
+    isempty(firm_sel) && return values
     use_threads = threads && Threads.nthreads() > 1
 
     if use_threads
@@ -355,9 +381,18 @@ function _economywide_esri(
         end
     else
         iter_range = verbose ? ProgressBar(firm_sel; total = length(firm_sel)) : firm_sel
+        workspace = _allocate_workspace(T, econ.n, num_industries(econ.info))
 
         for firm_idx in iter_range
-            values[firm_idx] = _solve_default_firm_esri(econ, weights, firm_idx, combine, maxiter, tol)
+            values[firm_idx] = _solve_default_firm_esri!(
+                econ,
+                workspace,
+                weights,
+                firm_idx,
+                combine,
+                maxiter,
+                tol,
+            )
         end
     end
 
@@ -382,6 +417,7 @@ function _run_scenario!(
         workspace.previous_downstream,
         workspace.sigmas,
         workspace.essential_matrix,
+        workspace.essential_touched,
         workspace.temp_sums,
         workspace.nonessential_vector,
         workspace.psi,

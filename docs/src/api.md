@@ -2,6 +2,8 @@
 
 ## Types
 
+`IndustryInfo(industry_of_firm)` infers the industry count from the largest one-based id and classifies every supplier-customer industry pair as essential.
+
 `IndustryInfo(industry_of_firm, essential_industry)` stores one one-based industry id per firm and one Boolean essentiality flag per supplying industry. It is a backwards-compatible shorthand: an essential industry is classified as `2` for every customer industry, and a non-essential industry as `1` for every customer industry.
 
 `IndustryInfo(industry_of_firm, input_classification)` accepts a square integer matrix whose rows are supplying industries and columns are customer industries. Each entry must be `2` (essential), `1` (non-essential), or `0` (no downstream production effect). Matrix indices and `industry_of_firm` must use the same one-based industry numbering. Input links classified as `0` still remain available to upstream propagation.

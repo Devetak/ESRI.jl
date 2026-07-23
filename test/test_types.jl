@@ -8,6 +8,11 @@
     @test info.essential_industry == essential_industry
     @test info.essential_firm == [true, false, true, false]
 
+    default_info = IndustryInfo(industry_ids)
+    @test default_info.input_classification == fill(UInt8(2), 2, 2)
+    @test default_info.essential_firm == trues(length(industry_ids))
+    @test_throws ArgumentError IndustryInfo(Int[])
+
     @test IndustryInfo(Int32[1, 2, 1, 2], Bool[true, false]).industry_of_firm == [1, 2, 1, 2]
     @test_throws ArgumentError IndustryInfo([0, 1], [true, false])
     @test_throws ArgumentError IndustryInfo([3, 1], [true, false])

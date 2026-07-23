@@ -160,6 +160,66 @@ end
     @test curr_u_sp ≈ curr_u atol = 1e-12 rtol = 0
 end
 
+@testset "Sparse active downstream parity" begin
+    W = [
+        0.0 2.0 3.0 1.0
+        4.0 0.0 5.0 2.0
+        6.0 1.0 0.0 3.0
+        2.0 4.0 1.0 0.0
+    ]
+    info = IndustryInfo([1, 1, 2, 2], [2 1; 1 2])
+    econ = ESRIEconomy(sparse(W), info)
+    essential = econ.downstream_impact_essential
+    nonessential = econ.downstream_impact_nonessential
+    psi = [0.0, 1.0, 0.4, 0.8]
+
+    regular_downstream = ones(4)
+    active_downstream = copy(regular_downstream)
+    regular_sigmas = zeros(4)
+    active_sigmas = zeros(4)
+    regular_matrix = zeros(4, 2)
+    active_matrix = zeros(4, 2)
+    regular_nonessential = zeros(4)
+    active_nonessential = zeros(4)
+    regular_temp = zeros(2)
+    active_temp = zeros(2)
+    active_touched = Int[]
+
+    for _ in 1:3
+        ESRIcascade.downstream_shock!(
+            essential,
+            nonessential,
+            info,
+            econ.row_sums,
+            psi,
+            regular_sigmas,
+            regular_matrix,
+            regular_nonessential,
+            regular_downstream,
+            regular_temp,
+        )
+        ESRIcascade.downstream_shock!(
+            essential,
+            nonessential,
+            info,
+            econ.row_sums,
+            psi,
+            active_sigmas,
+            active_matrix,
+            active_nonessential,
+            active_downstream,
+            active_temp,
+            active_touched,
+        )
+
+        @test active_downstream == regular_downstream
+        @test active_sigmas == regular_sigmas
+        @test active_nonessential == regular_nonessential
+        @test isempty(active_touched)
+        @test all(iszero, active_matrix)
+    end
+end
+
 @testset "Integer helper inputs" begin
     W = [1 1; 0 2]
     info = IndustryInfo([1, 1], [true])

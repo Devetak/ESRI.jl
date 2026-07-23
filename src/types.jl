@@ -1,6 +1,7 @@
 """
     IndustryInfo(industry_of_firm, essential_industry)
     IndustryInfo(industry_of_firm, input_classification)
+    IndustryInfo(industry_of_firm)
 
 Firm industry ids and input classifications. `input_classification[supplier, customer]`
 is `0` (no downstream impact), `1` (nonessential), or `2` (essential).
@@ -37,6 +38,20 @@ struct ESRIResult{T}
     esri::T
     upstream::Vector{T}
     downstream::Vector{T}
+end
+
+"""
+    IndustryInfo(industry_of_firm::AbstractVector{<:Integer})
+
+Build immutable industry metadata with every supplier-customer industry pair
+classified as essential. The number of industries is inferred from the largest
+industry id.
+"""
+function IndustryInfo(industry_of_firm::AbstractVector{<:Integer})
+    isempty(industry_of_firm) && throw(ArgumentError("industry_of_firm must be non-empty"))
+    nindustries = maximum(industry_of_firm)
+    nindustries > 0 || throw(ArgumentError("industry_of_firm values must be positive"))
+    return IndustryInfo(industry_of_firm, trues(nindustries))
 end
 
 """

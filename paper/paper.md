@@ -65,9 +65,17 @@ The repository contains paired Julia and R benchmark scripts for a one-to-one sp
 
 This comparison times the prepared sparse cascade rather than file parsing or operator construction. Julia prepares an `ESRIEconomy` once and times `esri(econ; firm_indices=1:16)`. The R script performs the equivalent GLcascade preprocessing once, drops explicit zero downstream entries to match Julia's sparse storage, and then times `fastcascade::GL_cascade_dynamics_cpp` directly. Both prepared downstream operators contain 3,896 nonzeros. The C++ routine accepts the 16 closures in one native call; Julia's public serial call completes those same 16 scenarios with a reused workspace. Both use one computational thread, tolerance `0.01`, and warmed calls. The Julia capacity vector and the C++ loss vector encode the same closures.
 
-The paired scripts compare all 16 scores with an absolute tolerance of `1e-12`. In the local single-thread study, the maximum Julia/C++ discrepancy was `6.11e-15`. Median prepared-solve times were about `0.05 s` for Julia and `2.8 s` for the native C++ routine, a roughly `55x` speedup on this fixed sparse fixture. The scripts report raw medians and parity results so that timing can be rerun on a target machine rather than treated as a hardware-independent constant.
+The paired scripts compare all 16 scores with an absolute tolerance of `1e-12`. Table 1 reports five warmed, single-thread samples on the local machine. It includes the 1,232-firm fixture and the `10,000`, `20,000`, `50,000`, and `100,000` paper-scale sizes selected through `ESRI_BENCHMARK_FIRMS`. For the larger fixtures, the C++ script writes the 16 native scores first and Julia must reproduce them before a timing is reported. The maximum discrepancy across this study was `6.00e-15`.
 
-The same paired workflow accepts `10,000`, `20,000`, `50,000`, and `100,000` firms through `ESRI_BENCHMARK_FIRMS`, matching the paper-scale sizes used previously. It writes the native-C++ closure scores and requires Julia to check them before reporting a timing. Those larger sparse runs are intentionally not reported here until the corrected direct comparison is executed.
+| Firms | Links | Downstream nonzeros | Julia median (s) | Native C++ median (s) | C++ / Julia | Max. absolute difference |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,232 | 9,856 | 3,896 | 0.04894 | 2.789 | 57.0x | 6.00e-15 |
+| 10,000 | 80,000 | 49,993 | 0.01590 | 0.978 | 61.5x | 2.68e-16 |
+| 20,000 | 160,000 | 113,259 | 0.02960 | 2.345 | 79.2x | 3.16e-16 |
+| 50,000 | 400,000 | 333,434 | 0.07838 | 7.157 | 91.3x | 3.30e-16 |
+| 100,000 | 800,000 | 725,178 | 0.15898 | 13.698 | 86.2x | 3.37e-16 |
+
+These are prepared-solve times for the same 16 sparse closures, rather than an all-firm ESRI vector. They are local hardware measurements, not hardware-independent constants; the scripts report raw medians and parity so the study can be reproduced on a target machine.
 
 ## Customer-specific classification study
 

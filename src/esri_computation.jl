@@ -232,18 +232,13 @@ function _compute_single_esri!(
     previous_downstream = workspace.previous_downstream
     psi = workspace.psi
     oneT = one(T)
-    zeroT = zero(T)
     fill!(previous_upstream, oneT)
     fill!(previous_downstream, oneT)
-    downstream_active = true
 
     for iter = 1:maxiter
-        downstream_distance = zeroT
-        if downstream_active
-            copyto!(current_downstream, previous_downstream)
-            _downstream_shock!(econ, workspace)
-            downstream_distance = _linf_distance(current_downstream, previous_downstream)
-        end
+        copyto!(current_downstream, previous_downstream)
+        _downstream_shock!(econ, workspace)
+        downstream_distance = _linf_distance(current_downstream, previous_downstream)
 
         upstream_step!(
             current_upstream,
@@ -254,18 +249,14 @@ function _compute_single_esri!(
         )
         upstream_distance = _linf_distance(current_upstream, previous_upstream)
 
-        if downstream_active
-            copyto!(previous_downstream, current_downstream)
-            downstream_active = downstream_distance >= tol
-        end
-
-        if upstream_distance < tol && !downstream_active
+        if max(upstream_distance, downstream_distance) < tol
             break
         end
         if verbose && (iter % 10 == 0)
             @info "joint iteration" iter max(upstream_distance, downstream_distance)
         end
         copyto!(previous_upstream, current_upstream)
+        copyto!(previous_downstream, current_downstream)
     end
 
     return _reduce_esri(current_upstream, current_downstream, final_weights, combine)

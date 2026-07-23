@@ -28,7 +28,7 @@ end
     @test direct ≈ wrapped atol = 1e-12 rtol = 0
 end
 
-@testset "Split convergence matches lockstep reference" begin
+@testset "Joint convergence matches lockstep reference" begin
     W_dense, info_dense = deterministic_fixture()
     econ_dense = ESRIEconomy(W_dense, info_dense)
 
@@ -37,6 +37,16 @@ end
     @test got_dense.esri ≈ ref_dense.esri atol = 1e-12 rtol = 0
     @test got_dense.upstream ≈ ref_dense.upstream atol = 1e-12 rtol = 0
     @test got_dense.downstream ≈ ref_dense.downstream atol = 1e-12 rtol = 0
+
+    # Downstream convergence must stay coupled to upstream convergence.
+    W_coupled = sparse([0.0 2.0; 1.0 1.0])
+    econ_coupled = ESRIEconomy(W_coupled, IndustryInfo([1, 1], [true]))
+    ref_coupled = reference_lockstep_scenario(econ_coupled, 1; maxiter = 100, tol = 1e-2)
+    got_coupled = esri(econ_coupled, 1; details = true, maxiter = 100, tol = 1e-2)
+    @test got_coupled.esri ≈ 0.9997713763145861 atol = 1e-12 rtol = 0
+    @test got_coupled.esri ≈ ref_coupled.esri atol = 1e-12 rtol = 0
+    @test got_coupled.upstream ≈ ref_coupled.upstream atol = 1e-12 rtol = 0
+    @test got_coupled.downstream ≈ ref_coupled.downstream atol = 1e-12 rtol = 0
 
     W_sparse, info_sparse, _ = powerlaw_fixture(seed = 8, n = 40, mean_degree = 6, max_degree = 32)
     econ_sparse = ESRIEconomy(W_sparse, info_sparse)

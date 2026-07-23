@@ -27,3 +27,19 @@ The R script requires `GLcascade` and `fastcascade` 0.9.3.1 and calls
 the public `IndustryInfo`, `ESRIEconomy`, and `esri` API. Both check the same
 16 C++ reference scores to `1e-12`; compare their printed medians only after
 both parity checks pass.
+
+For the paper-scale firm counts `10_000`, `20_000`, `50_000`, and `100_000`,
+set `ESRI_BENCHMARK_FIRMS`. Firms are assigned evenly across the same 616
+industries, with any remainder assigned once to the first industries. The C++
+script writes the 16 reference scores and Julia reads them before timing:
+
+```bash
+for firms in 10000 20000 50000 100000; do
+  reference=/tmp/esri-cpp-${firms}.csv
+  ESRI_BENCHMARK_FIRMS=$firms ESRI_REFERENCE_SCORES=$reference \
+    ESRI_IHS_MATRIX=/path/to/EssMatIHS.csv Rscript benchmark/ihs_sparse_fastcascade.R
+  ESRI_BENCHMARK_FIRMS=$firms ESRI_REFERENCE_SCORES=$reference \
+    ESRI_IHS_MATRIX=/path/to/EssMatIHS.csv JULIA_NUM_THREADS=1 \
+    julia --project=. benchmark/ihs_sparse_julia.jl
+done
+```

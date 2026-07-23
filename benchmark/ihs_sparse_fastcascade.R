@@ -12,9 +12,12 @@ colnames(E) <- colnames(d)
 stopifnot(nrow(E) == ncol(E), identical(rownames(E), colnames(E)), all(E %in% 0:2))
 
 m <- nrow(E)
-n <- 2L * m
-p <- rep(rownames(E), each = 2L)
-p_cons <- match(p, rownames(E))
+n <- as.integer(Sys.getenv("ESRI_BENCHMARK_FIRMS", as.character(2L * m)))
+if (n < m) stop("ESRI_BENCHMARK_FIRMS must be at least the number of industries")
+firms_per_industry <- n %/% m
+extra_firms <- n %% m
+p_cons <- c(rep(seq_len(m), each = firms_per_industry), seq_len(extra_firms))
+p <- rownames(E)[p_cons]
 offsets <- c(1L, 37L, 91L, 173L, 311L, 509L, 701L, 997L)
 supplier <- rep(seq_len(n), each = length(offsets))
 customer <- unlist(lapply(seq_len(n), function(i) ((i + offsets - 1L) %% n) + 1L), use.names = FALSE)
@@ -54,6 +57,10 @@ cpp_scores <- c(
 
 invisible(run_cpp())
 scores <- as.numeric(run_cpp()[, 1L])
+reference_path <- Sys.getenv("ESRI_REFERENCE_SCORES", "")
+if (nzchar(reference_path)) {
+  write.table(scores, file = reference_path, sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE)
+}
 samples <- vapply(
   seq_len(as.integer(Sys.getenv("ESRI_BENCHMARK_SAMPLES", "5"))),
   function(i) system.time(invisible(run_cpp()))[["elapsed"]],
@@ -62,5 +69,7 @@ samples <- vapply(
 cat("firms=", n, " industries=", m, " edges=", length(W@x), " closures=16\n", sep = "")
 cat("downstream_nnz=", length(Lambda_d@x), "\n", sep = "")
 cat("cpp_prepared_median_s=", median(samples), "\n", sep = "")
-cat("max_abs_error_to_reference=", max(abs(scores - cpp_scores)), "\n", sep = "")
-stopifnot(max(abs(scores - cpp_scores)) <= 1e-12)
+if (n == 2L * m) {
+  cat("max_abs_error_to_reference=", max(abs(scores - cpp_scores)), "\n", sep = "")
+  stopifnot(max(abs(scores - cpp_scores)) <= 1e-12)
+}

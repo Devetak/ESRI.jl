@@ -67,6 +67,8 @@ This comparison times the prepared sparse cascade rather than file parsing or op
 
 The paired scripts compare all 16 scores with an absolute tolerance of `1e-12`. In the local single-thread study, the maximum Julia/C++ discrepancy was `6.11e-15`. Median prepared-solve times were about `0.05 s` for Julia and `2.8 s` for the native C++ routine, a roughly `55x` speedup on this fixed sparse fixture. The scripts report raw medians and parity results so that timing can be rerun on a target machine rather than treated as a hardware-independent constant.
 
+The same paired workflow accepts `10,000`, `20,000`, `50,000`, and `100,000` firms through `ESRI_BENCHMARK_FIRMS`, matching the paper-scale sizes used previously. It writes the native-C++ closure scores and requires Julia to check them before reporting a timing. Those larger sparse runs are intentionally not reported here until the corrected direct comparison is executed.
+
 ## Customer-specific classification study
 
 The package supports the reference convention in which input type depends on both the supplying and purchasing industries. Each IHS-matrix entry is `2` for an essential input, `1` for a non-essential input, or `0` for an input with no short-term downstream production impact. Zero-classified links remain available to upstream propagation. The bundled matrix contains 65,239 essential, 45,013 non-essential, and 269,204 no-short-term-impact classifications.

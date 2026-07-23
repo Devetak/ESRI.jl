@@ -12,8 +12,13 @@ labels == raw[1, 2:end] || error("IHS row and column labels must have the same o
 classification = parse.(Int, raw[2:end, 2:end])
 
 industries = size(classification, 1)
-n = 2 * industries
-industry_of_firm = repeat(1:industries, inner = 2)
+n = parse(Int, get(ENV, "ESRI_BENCHMARK_FIRMS", string(2 * industries)))
+n >= industries || error("ESRI_BENCHMARK_FIRMS must be at least the number of industries")
+firms_per_industry, extra_firms = divrem(n, industries)
+industry_of_firm = vcat(
+    repeat(1:industries, inner = firms_per_industry),
+    1:extra_firms,
+)
 offsets = (1, 37, 91, 173, 311, 509, 701, 997)
 supplier = repeat(1:n, inner = length(offsets))
 customer = [mod1(i + offset, n) for i in 1:n for offset in offsets]
@@ -34,12 +39,23 @@ function run_julia(econ)
     )[1:16]
 end
 
-cpp_scores = [
+default_cpp_scores = [
     0.87837245554794330, 0.87825862250992404, 0.87664923655232285, 0.87566688889824862,
     0.87524585194239457, 0.87433651919608424, 0.86060405584903987, 0.84701627242865141,
     0.85599031156433647, 0.85741739269669437, 0.85466742541113849, 0.85393912577670528,
     0.84935069451138689, 0.77626516574715354, 0.84447307983109421, 0.84456652158172307,
 ]
+
+cpp_scores = if n == 2 * industries
+    default_cpp_scores
+else
+    reference_path = get(ENV, "ESRI_REFERENCE_SCORES", "")
+    isfile(reference_path) || error(
+        "Set ESRI_REFERENCE_SCORES to the C++ score file for non-default firm counts",
+    )
+    vec(readdlm(reference_path, ',', Float64))
+end
+length(cpp_scores) == 16 || error("C++ reference must contain 16 closure scores")
 
 scores = run_julia(econ)
 samples = [

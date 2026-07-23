@@ -1,8 +1,14 @@
 # Mathematical Model
 
-Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix with entry `W_{ij}` equal to supply from firm `i` to firm `j`. Let `g(i)` be the industry of firm `i`. Let `e_k \in \{0,1\}` be the essentiality flag of industry `k`. In the package input, firm `i` is essential exactly when `e_{g(i)} = 1`.
+Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix with entry `W_{ij}` equal to supply from firm `i` to firm `j`. Let `g(i)` be the industry of firm `i`. The input-classification matrix `C` has one row per supplying industry and one column per customer industry:
 
-Relative to the paper, the package uses one Boolean essentiality flag per industry and a capacity-cap vector `\psi \in [0,1]^N`.
+```math
+C_{k\ell} \in \{0,1,2\}.
+```
+
+Here `2` marks industry `k` as essential to industry `\ell`, `1` marks it as non-essential, and `0` gives the link no short-term downstream production effect. The legacy Boolean vector is shorthand for setting each row of `C` entirely to `2` or entirely to `1`.
+
+The package also uses a capacity-cap vector `\psi \in [0,1]^N`.
 
 The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, firm `i` can operate at at most a `\psi_i` fraction of its normal capacity. This is the main way to describe a shock scenario in the package. You can use it for one closed firm, a partly constrained sector, or a wider event such as an energy shortage, sanctions, or a port disruption. ESRI then shows how that initial shock can move through supply chains and affect the wider economy.
 
@@ -50,10 +56,10 @@ u_i^{(t+1)} =
 
 ## Downstream operators
 
-For each customer `j`, define the total weight of essential suppliers from industry `k` by
+For each customer `j`, define the total input weight from supplier industry `k` by
 
 ```math
-E_{jk} = \sum_{i=1}^N W_{ij} \, \mathbf{1}_{e_{g(i)} = 1} \, \mathbf{1}_{g(i)=k}.
+E_{jk} = \sum_{i=1}^N W_{ij} \, \mathbf{1}_{g(i)=k}.
 ```
 
 Define the essential downstream operator `D^{(e)}` and the non-essential downstream operator `D^{(n)}` by
@@ -61,7 +67,7 @@ Define the essential downstream operator `D^{(e)}` and the non-essential downstr
 ```math
 D^{(e)}_{ij} =
 \begin{cases}
-\dfrac{W_{ij}}{E_{j,g(i)}}, & e_{g(i)} = 1 \text{ and } E_{j,g(i)} > 0, \\
+\dfrac{W_{ij}}{E_{j,g(i)}}, & C_{g(i),g(j)} = 2 \text{ and } E_{j,g(i)} > 0, \\
 0, & \text{otherwise},
 \end{cases}
 ```
@@ -69,10 +75,12 @@ D^{(e)}_{ij} =
 ```math
 D^{(n)}_{ij} =
 \begin{cases}
-\dfrac{W_{ij}}{c_j}, & e_{g(i)} = 0 \text{ and } c_j > 0, \\
+\dfrac{W_{ij}}{c_j}, & C_{g(i),g(j)} = 1 \text{ and } c_j > 0, \\
 0, & \text{otherwise}.
 \end{cases}
 ```
+
+Thus a class-`0` input is absent from both downstream operators but remains in `W` and therefore in the upstream operator. It also remains part of `c_j` when class-`1` inputs are normalized.
 
 ## Supplier rationing factor
 

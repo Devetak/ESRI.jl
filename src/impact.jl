@@ -84,21 +84,23 @@ function compute_downstream_impact_matrices(
     essential = zeros(TF, nrows, ncols)
     nonessential = zeros(TF, nrows, ncols)
     industry_of_firm = info.industry_of_firm
-    essential_firm = info.essential_firm
+    input_classification = info.input_classification
     essential_by_industry = zeros(TF, num_industries(info))
     zeroT = zero(TF)
 
     @inbounds for col = 1:ncols
         fill!(essential_by_industry, zeroT)
         total = zeroT
+        customer_industry = industry_of_firm[col]
         for row = 1:nrows
             val = weight_matrix[row, col]
             if val == 0
                 continue
             end
             total += val
-            if essential_firm[row]
-                essential_by_industry[industry_of_firm[row]] += val
+            supplier_industry = industry_of_firm[row]
+            if input_classification[supplier_industry, customer_industry] == 2
+                essential_by_industry[supplier_industry] += val
             end
         end
 
@@ -107,11 +109,13 @@ function compute_downstream_impact_matrices(
             if val == 0
                 continue
             end
-            if essential_firm[row]
-                denom = essential_by_industry[industry_of_firm[row]]
+            supplier_industry = industry_of_firm[row]
+            classification = input_classification[supplier_industry, customer_industry]
+            if classification == 2
+                denom = essential_by_industry[supplier_industry]
                 essential[row, col] = denom == 0 ? zeroT : val / denom
-            else
-                nonessential[row, col] = val / total
+            elseif classification == 1
+                nonessential[row, col] = total == 0 ? zeroT : val / total
             end
         end
     end
@@ -132,7 +136,10 @@ function compute_downstream_impact_matrices(
     nonessential_vals = zeros(TF, length(vals))
 
     num_inds = num_industries(info)
+    industry_of_firm = info.industry_of_firm
+    input_classification = info.input_classification
     essential_by_industry = zeros(TF, num_inds)
+    zeroT = zero(TF)
 
     @inbounds for col = 1:ncols
         start_idx = colptr[col]
@@ -141,24 +148,28 @@ function compute_downstream_impact_matrices(
             continue
         end
 
-        fill!(essential_by_industry, zero(TF))
-        all_suppliers_total = zero(TF)
+        fill!(essential_by_industry, zeroT)
+        all_suppliers_total = zeroT
+        customer_industry = industry_of_firm[col]
         for idx = start_idx:stop_idx
             row = rows[idx]
             val = vals[idx]
             all_suppliers_total += val
-            if is_essential(info, row)
-                essential_by_industry[get_industry(info, row)] += val
+            supplier_industry = industry_of_firm[row]
+            if input_classification[supplier_industry, customer_industry] == 2
+                essential_by_industry[supplier_industry] += val
             end
         end
 
         for idx = start_idx:stop_idx
             row = rows[idx]
             val = vals[idx]
-            if is_essential(info, row)
-                denom = essential_by_industry[get_industry(info, row)]
-                essential_vals[idx] = denom == 0 ? zero(TF) : val / denom
-            else
+            supplier_industry = industry_of_firm[row]
+            classification = input_classification[supplier_industry, customer_industry]
+            if classification == 2
+                denom = essential_by_industry[supplier_industry]
+                essential_vals[idx] = denom == 0 ? zeroT : val / denom
+            elseif classification == 1
                 nonessential_vals[idx] = all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
             end
         end
@@ -166,6 +177,8 @@ function compute_downstream_impact_matrices(
 
     essential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), essential_vals)
     nonessential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), nonessential_vals)
+    dropzeros!(essential_csc)
+    dropzeros!(nonessential_csc)
     return sparsecsr(essential_csc), sparsecsr(nonessential_csc)
 end
 

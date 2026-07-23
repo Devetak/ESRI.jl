@@ -4,6 +4,8 @@ If `ESRIEconomy(W, info)` throws `DimensionMismatch`, then `W` is not square or 
 
 If `IndustryInfo(industry_of_firm, essential_industry)` throws `ArgumentError`, then `essential_industry` is empty or some firm industry id lies outside `1:length(essential_industry)`.
 
+For `IndustryInfo(industry_of_firm, input_classification)`, the classification matrix must be non-empty and square, industry ids must lie in `1:size(input_classification, 1)`, and every entry must be `0`, `1`, or `2`. Its rows are supplier industries and its columns are customer industries.
+
 If `esri(econ, firm_idx; ...)` throws `BoundsError`, then `firm_idx` is out of range. If `esri(econ; firm_indices=...)` throws `BoundsError`, then one entry of `firm_indices` is out of range.
 
 If `combine` is invalid, the package accepts only `:min`, `:upstream`, and `:downstream`.

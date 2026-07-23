@@ -12,6 +12,17 @@
     @test_throws ArgumentError IndustryInfo([0, 1], [true, false])
     @test_throws ArgumentError IndustryInfo([3, 1], [true, false])
     @test_throws ArgumentError IndustryInfo([1, 1], Bool[])
+
+    classification = [2 1; 0 2]
+    classified = IndustryInfo(industry_ids, classification)
+    @test classified.industry_of_firm == industry_ids
+    @test classified.input_classification == UInt8[2 1; 0 2]
+    @test ESRIcascade.num_industries(classified) == 2
+
+    @test_throws DimensionMismatch IndustryInfo([1, 2], zeros(Int, 2, 3))
+    @test_throws ArgumentError IndustryInfo([1, 2], zeros(Int, 0, 0))
+    @test_throws ArgumentError IndustryInfo([1, 2], [0 1; 2 3])
+    @test_throws ArgumentError IndustryInfo([3, 1], zeros(Int, 2, 2))
 end
 
 @testset "Internal helper functions" begin

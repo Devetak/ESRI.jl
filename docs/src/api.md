@@ -2,7 +2,9 @@
 
 ## Types
 
-`IndustryInfo(industry_of_firm, essential_industry)` stores one industry id per firm and one Boolean essentiality flag per industry. Industry ids are one-based.
+`IndustryInfo(industry_of_firm, essential_industry)` stores one one-based industry id per firm and one Boolean essentiality flag per supplying industry. It is a backwards-compatible shorthand: an essential industry is classified as `2` for every customer industry, and a non-essential industry as `1` for every customer industry.
+
+`IndustryInfo(industry_of_firm, input_classification)` accepts a square integer matrix whose rows are supplying industries and columns are customer industries. Each entry must be `2` (essential), `1` (non-essential), or `0` (no downstream production effect). Matrix indices and `industry_of_firm` must use the same one-based industry numbering. Input links classified as `0` still remain available to upstream propagation.
 
 `ESRIEconomy(W, info)` caches the normalized upstream/downstream operators, row sums, column sums, total output, and firm count.
 
@@ -36,7 +38,7 @@
 
 ## Validation
 
-`BoundsError` covers out-of-range firm ids. `ArgumentError` covers invalid `combine`, invalid `components`, duplicate `firm_indices`, empty `essential_industry`, and invalid industry ids. `DimensionMismatch` covers shape mismatches for `W`, `final_weights`, and `shock`. `DomainError` covers non-finite or negative `W`, non-finite or negative `final_weights`, and `shock` values outside `[0,1]`.
+`BoundsError` covers out-of-range firm ids. `ArgumentError` covers invalid `combine`, invalid `components`, duplicate `firm_indices`, empty classifications, invalid industry ids, and classification entries other than `0`, `1`, or `2`. `DimensionMismatch` covers shape mismatches for `W`, `input_classification`, `final_weights`, and `shock`. `DomainError` covers non-finite or negative `W`, non-finite or negative `final_weights`, and `shock` values outside `[0,1]`.
 
 ```@docs
 IndustryInfo

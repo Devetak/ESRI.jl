@@ -45,6 +45,17 @@ scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
 nothing
 ```
 
+For customer-specific input requirements, pass a `0`/`1`/`2` matrix instead. Rows
+are supplier industries and columns are customer industries: `2` is essential, `1`
+is non-essential, and `0` has no downstream production effect (but remains in the
+upstream network). The Boolean-vector form above remains a shorthand for using the
+same classification for every customer industry.
+
+```julia
+input_classification = [2 1 0; 0 2 1; 1 0 2]
+info = IndustryInfo(rand(1:3, N), input_classification)
+```
+
 Example score distribution from the same kind of run:
 
 ![Histogram of example ESRI scores](docs/src/assets/scores_hist.svg)

@@ -221,15 +221,17 @@ function downstream_step!(
 )
     n = size(essential_matrix, 1)
     ncols = size(essential_matrix, 2)
-    @inbounds for firm_idx = 1:n
-        essential_shortage = zero(eltype(downstream_vector))
-        for col = 1:ncols
-            val = essential_matrix[firm_idx, col]
-            if val > essential_shortage
-                essential_shortage = val
-            end
+    fill!(downstream_vector, zero(eltype(downstream_vector)))
+    @inbounds for col = 1:ncols
+        @simd for firm_idx = 1:n
+            downstream_vector[firm_idx] = max(
+                downstream_vector[firm_idx],
+                essential_matrix[firm_idx, col],
+            )
         end
-        essential_health = one(eltype(downstream_vector)) - essential_shortage
+    end
+    @inbounds for firm_idx = 1:n
+        essential_health = one(eltype(downstream_vector)) - downstream_vector[firm_idx]
         nonessential_health = one(eltype(downstream_vector)) - nonessential_vector[firm_idx]
         downstream_vector[firm_idx] = min(essential_health, nonessential_health, psi[firm_idx])
     end

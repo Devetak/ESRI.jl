@@ -38,6 +38,99 @@
     @test Matrix(n3_sparse)[:, 4] == zeros(4)
 end
 
+@testset "Per-customer input classifications" begin
+    W = [
+        0.0 0.0 0.0 2.0
+        0.0 0.0 0.0 3.0
+        0.0 0.0 0.0 5.0
+        0.0 0.0 0.0 7.0
+    ]
+    info = IndustryInfo(
+        [1, 1, 2, 3],
+        [
+            0 0 2
+            0 0 1
+            1 0 0
+        ],
+    )
+
+    essential_dense, nonessential_dense = ESRIcascade.compute_downstream_impact_matrices(W, info)
+    essential_sparse, nonessential_sparse = ESRIcascade.compute_downstream_impact_matrices(sparse(W), info)
+
+    @test essential_dense[1, 4] == 2 / 5
+    @test essential_dense[2, 4] == 3 / 5
+    @test essential_dense[3, 4] == 0
+    @test essential_dense[4, 4] == 0
+    @test nonessential_dense[3, 4] == 5 / 17
+    @test nonessential_dense[1, 4] == 0
+    @test nonessential_dense[2, 4] == 0
+    @test nonessential_dense[4, 4] == 0
+    @test Matrix(essential_sparse) == essential_dense
+    @test Matrix(nonessential_sparse) == nonessential_dense
+    @test length(essential_sparse.nzval) == 2
+    @test length(nonessential_sparse.nzval) == 1
+end
+
+@testset "Legacy Boolean classification parity" begin
+    W = [
+        1.0 2.0 0.0 0.0
+        0.0 1.0 3.0 0.0
+        4.0 0.0 1.0 5.0
+        0.0 6.0 0.0 1.0
+    ]
+    industries = [1, 1, 2, 3]
+    legacy = IndustryInfo(industries, [true, false, true])
+    classified = IndustryInfo(
+        industries,
+        [
+            2 2 2
+            1 1 1
+            2 2 2
+        ],
+    )
+
+    for weights in (W, sparse(W))
+        legacy_essential, legacy_nonessential = ESRIcascade.compute_downstream_impact_matrices(weights, legacy)
+        classified_essential, classified_nonessential = ESRIcascade.compute_downstream_impact_matrices(weights, classified)
+        @test Matrix(classified_essential) == Matrix(legacy_essential)
+        @test Matrix(classified_nonessential) == Matrix(legacy_nonessential)
+    end
+
+    shock = [0.0, 1.0, 0.6, 1.0]
+    legacy_result = esri_shock(ESRIEconomy(sparse(W), legacy), shock; details = true, maxiter = 60, tol = 1e-10)
+    classified_result = esri_shock(ESRIEconomy(sparse(W), classified), shock; details = true, maxiter = 60, tol = 1e-10)
+    @test classified_result.esri == legacy_result.esri
+    @test classified_result.upstream == legacy_result.upstream
+    @test classified_result.downstream == legacy_result.downstream
+end
+
+@testset "C++ mixed-classification parity" begin
+    W = [
+        0.0 3.0 2.0 7.0 5.0 11.0
+        4.0 0.0 9.0 1.0 8.0 6.0
+        10.0 2.0 0.0 4.0 3.0 7.0
+        6.0 5.0 1.0 0.0 9.0 2.0
+        8.0 3.0 6.0 10.0 0.0 4.0
+        2.0 7.0 5.0 3.0 11.0 0.0
+    ]
+    info = IndustryInfo(
+        [1, 2, 3, 1, 2, 3],
+        [
+            2 1 0
+            0 2 1
+            1 0 2
+        ],
+    )
+
+    econ = ESRIEconomy(sparse(W), info)
+    permuted = ESRIcascade._permute_sparse_economy(econ, [2, 1, 3, 4, 5, 6])
+    @test permuted.info.input_classification == info.input_classification
+
+    result = esri(econ, 1; details = true, combine = :downstream, maxiter = 150, tol = 1e-12)
+    @test result.esri ≈ 0.50687988214742541 atol = 1e-12 rtol = 0
+    @test result.downstream ≈ [0.0, 0.6, 0.7894068197483480, 0.0, 0.6111111111111110, 0.8786670560685980] atol = 1e-12 rtol = 0
+end
+
 @testset "Propagation kernels" begin
     info = IndustryInfo([1, 1, 2], [true, false])
     sigmas = zeros(3)

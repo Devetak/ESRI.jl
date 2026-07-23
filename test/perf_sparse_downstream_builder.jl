@@ -81,8 +81,8 @@ function main()
 
     old_ess, old_non = old_call()
     new_ess, new_non = new_call()
-    if !(isapprox(old_ess.nzval, new_ess.nzval; atol = 1e-12, rtol = 1e-12) &&
-         isapprox(old_non.nzval, new_non.nzval; atol = 1e-12, rtol = 1e-12))
+    if !(isapprox(Matrix(old_ess), Matrix(new_ess); atol = 1e-12, rtol = 1e-12) &&
+         isapprox(Matrix(old_non), Matrix(new_non); atol = 1e-12, rtol = 1e-12))
         error("sparse downstream builder mismatch between old and new implementation")
     end
 

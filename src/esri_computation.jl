@@ -139,7 +139,7 @@ end
 
 function _permute_sparse_economy(econ::ESRIEconomy, perm::AbstractVector{Int})
     return ESRIEconomy(
-        IndustryInfo(econ.info.industry_of_firm[perm], econ.info.essential_industry),
+        IndustryInfo(econ.info.industry_of_firm[perm], econ.info.input_classification),
         econ.upstream_impact[perm, perm],
         _permute_sparse_csr(econ.downstream_impact_essential, perm),
         _permute_sparse_csr(econ.downstream_impact_nonessential, perm),

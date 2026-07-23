@@ -7,21 +7,13 @@ function create_upstream_impact_matrix(weight_matrix::AbstractMatrix{T}) where {
     nrows, ncols = size(weight_matrix)
     TF = float(T)
     result = zeros(TF, nrows, ncols)
-    row_sums = zeros(TF, nrows)
 
     @inbounds for source = 1:nrows
-        acc = zero(TF)
+        denom = zero(TF)
         for target = 1:ncols
-            acc += weight_matrix[source, target]
+            denom += weight_matrix[source, target]
         end
-        row_sums[source] = acc
-    end
-
-    @inbounds for source = 1:nrows
-        denom = row_sums[source]
-        if denom == 0
-            continue
-        end
+        denom == 0 && continue
         for target = 1:ncols
             val = weight_matrix[source, target]
             if val != 0

@@ -208,77 +208,20 @@ function downstream_shock!(
     industry_map::AbstractVector{Int} = info.industry_of_firm,
 ) where {T}
     fill!(essential_matrix, zero(T))
-    essential_touched = Int[]
-    compute_sigmas!(sigmas, row_sums, current_downstream, info, temp_sums, industry_map)
-    _accumulate_active_sparse_downstream_components!(
-        essential_matrix,
-        essential_touched,
-        nonessential_vector,
-        current_downstream,
-        sigmas,
+    return downstream_shock!(
         essential_impact,
         nonessential_impact,
         info,
-        industry_map,
-    )
-    downstream_step!(
-        current_downstream,
-        essential_matrix,
-        essential_touched,
-        nonessential_vector,
+        row_sums,
         psi,
+        sigmas,
+        essential_matrix,
+        nonessential_vector,
+        current_downstream,
+        temp_sums,
+        Int[];
+        industry_map = industry_map,
     )
-    return nothing
-end
-
-function _update_downstream!(
-    essential_impact::AbstractMatrix,
-    nonessential_impact::AbstractMatrix,
-    info::IndustryInfo,
-    workspace::_ESRIWorkspace,
-)
-    _accumulate_downstream_components!(
-        workspace.essential_matrix,
-        workspace.nonessential_vector,
-        workspace.current_downstream,
-        workspace.sigmas,
-        essential_impact,
-        nonessential_impact,
-        info,
-    )
-    downstream_step!(
-        workspace.current_downstream,
-        workspace.essential_matrix,
-        workspace.nonessential_vector,
-        workspace.psi,
-    )
-    return nothing
-end
-
-function _update_downstream!(
-    essential_impact::SparseMatrixCSR,
-    nonessential_impact::SparseMatrixCSR,
-    info::IndustryInfo,
-    workspace::_ESRIWorkspace{T},
-) where {T}
-    _accumulate_active_sparse_downstream_components!(
-        workspace.essential_matrix,
-        workspace.essential_touched,
-        workspace.nonessential_vector,
-        workspace.current_downstream,
-        workspace.sigmas,
-        essential_impact,
-        nonessential_impact,
-        info,
-    )
-    downstream_step!(
-        workspace.current_downstream,
-        workspace.essential_matrix,
-        workspace.essential_touched,
-        workspace.nonessential_vector,
-        workspace.psi,
-    )
-    return nothing
 end
 
 function downstream_shock!(
@@ -347,17 +290,17 @@ function downstream_shock!(
 end
 
 function _downstream_shock!(econ::ESRIEconomy{T}, workspace::_ESRIWorkspace{T}) where {T}
-    compute_sigmas!(
-        workspace.sigmas,
-        econ.row_sums,
-        workspace.current_downstream,
-        econ.info,
-        workspace.temp_sums,
-    )
-    return _update_downstream!(
+    return downstream_shock!(
         econ.downstream_impact_essential,
         econ.downstream_impact_nonessential,
         econ.info,
-        workspace,
+        econ.row_sums,
+        workspace.psi,
+        workspace.sigmas,
+        workspace.essential_matrix,
+        workspace.nonessential_vector,
+        workspace.current_downstream,
+        workspace.temp_sums,
+        workspace.essential_touched,
     )
 end

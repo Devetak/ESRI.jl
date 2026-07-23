@@ -160,7 +160,7 @@ end
     @test curr_u_sp ≈ curr_u atol = 1e-12 rtol = 0
 end
 
-@testset "Sparse active downstream parity" begin
+@testset "Sparse downstream parity" begin
     W = [
         0.0 2.0 3.0 1.0
         4.0 0.0 5.0 2.0
@@ -168,56 +168,18 @@ end
         2.0 4.0 1.0 0.0
     ]
     info = IndustryInfo([1, 1, 2, 2], [2 1; 1 2])
-    econ = ESRIEconomy(sparse(W), info)
-    essential = econ.downstream_impact_essential
-    nonessential = econ.downstream_impact_nonessential
     psi = [0.0, 1.0, 0.4, 0.8]
+    dense = ESRIEconomy(W, info)
+    sparse_econ = ESRIEconomy(sparse(W), info)
 
-    regular_downstream = ones(4)
-    active_downstream = copy(regular_downstream)
-    regular_sigmas = zeros(4)
-    active_sigmas = zeros(4)
-    regular_matrix = zeros(4, 2)
-    active_matrix = zeros(4, 2)
-    regular_nonessential = zeros(4)
-    active_nonessential = zeros(4)
-    regular_temp = zeros(2)
-    active_temp = zeros(2)
-    active_touched = Int[]
+    dense_scores = esri(dense; firm_indices = 1:4, maxiter = 80, tol = 1e-12)
+    sparse_scores = esri(sparse_econ; firm_indices = 1:4, maxiter = 80, tol = 1e-12)
+    @test sparse_scores ≈ dense_scores atol = 1e-12 rtol = 0
 
-    for _ in 1:3
-        ESRIcascade.downstream_shock!(
-            essential,
-            nonessential,
-            info,
-            econ.row_sums,
-            psi,
-            regular_sigmas,
-            regular_matrix,
-            regular_nonessential,
-            regular_downstream,
-            regular_temp,
-        )
-        ESRIcascade.downstream_shock!(
-            essential,
-            nonessential,
-            info,
-            econ.row_sums,
-            psi,
-            active_sigmas,
-            active_matrix,
-            active_nonessential,
-            active_downstream,
-            active_temp,
-            active_touched,
-        )
-
-        @test active_downstream == regular_downstream
-        @test active_sigmas == regular_sigmas
-        @test active_nonessential == regular_nonessential
-        @test isempty(active_touched)
-        @test all(iszero, active_matrix)
-    end
+    dense_result = esri_shock(dense, psi; details = true, maxiter = 80, tol = 1e-12)
+    sparse_result = esri_shock(sparse_econ, psi; details = true, maxiter = 80, tol = 1e-12)
+    @test sparse_result.esri ≈ dense_result.esri atol = 1e-12 rtol = 0
+    @test sparse_result.downstream ≈ dense_result.downstream atol = 1e-12 rtol = 0
 end
 
 @testset "Integer helper inputs" begin

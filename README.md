@@ -58,8 +58,8 @@ input_classification = [2 1 0; 0 2 1; 1 0 2]
 info = IndustryInfo(rand(1:3, N), input_classification)
 ```
 
-CSV loading stays with the caller; for a numeric, header-free CSV, Julia's standard
-library is enough:
+For an arbitrary user-supplied matrix, CSV loading stays with the caller; for a
+numeric, header-free CSV, Julia's standard library is enough:
 
 ```julia
 using DelimitedFiles
@@ -73,10 +73,21 @@ mapping firm data to one-based ids, then remove the labels before construction:
 ```julia
 raw = readdlm("EssMatIHS.csv", ',', String)
 industry_codes = raw[1, 2:end]
-@assert raw[2:end, 1] == industry_codes
 input_classification = parse.(UInt8, raw[2:end, 2:end])
 industry_id = Dict(code => i for (i, code) in pairs(industry_codes))
 info = IndustryInfo([industry_id[code] for code in firm_industry_codes], input_classification)
+```
+
+The IHS matrix is also bundled as a compact default asset, without changing the
+existing all-essential `IndustryInfo(industry_of_firm)` default:
+
+```julia
+industry_codes = ihs_industry_codes()
+industry_id = Dict(code => i for (i, code) in pairs(industry_codes))
+info = IndustryInfo(
+    [industry_id[code] for code in firm_industry_codes],
+    ihs_input_classification(),
+)
 ```
 
 Example score distribution from the same kind of run:
@@ -95,23 +106,13 @@ Build `ESRIEconomy` once and reuse it on the same network.
 - `final_weights` replaces the weights in the final ESRI reduction. With custom weights, the scalar is the weighted loss divided by `sum(final_weights)`.
 - `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. It does not add a second shock on top.
 
-## Reference benchmarks
+## Sparse C++ reference benchmark
 
-Local reference runs from `2026-04-12` on `Apple M2`, with `JULIA_NUM_THREADS=1`, `mean_degree=7`, `alpha=2.3`, `nindustries=50`, and `maxiter=30`. These timings call full `esri(econ; ...)` over all firms.
-
-| mode | firms | nnz | max_degree | p99_degree | top1pct_edge_share | build_s | solve_s |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `truncated_tail` | 5_000 | 35_000 | 111 | 25 | 0.0637 | 0.0312 | 6.5329 |
-| `heavy_tail` | 5_000 | 35_000 | 385 | 26 | 0.0928 | 0.0020 | 5.7411 |
-| `truncated_tail` | 10_000 | 70_000 | 128 | 24 | 0.0616 | 0.0388 | 26.6213 |
-| `heavy_tail` | 10_000 | 70_000 | 964 | 25 | 0.1071 | 0.0334 | 26.4600 |
-
-Run with:
-
-```bash
-julia --project test/perf_full_powerlaw_esri.jl 10000 truncated_tail
-julia --project test/perf_full_powerlaw_esri.jl 10000 heavy_tail
-```
+`benchmark/` contains a one-to-one prepared sparse comparison against
+`fastcascade::GL_cascade_dynamics_cpp`: the same IHS classification matrix,
+1,232 firms, 9,856 sparse links, 16 closures, tolerance, and one-thread setting.
+Both runners check the same C++ reference scores before printing medians. See
+[benchmark/README.md](benchmark/README.md) for the two commands and prerequisites.
 
 ## Reference
 

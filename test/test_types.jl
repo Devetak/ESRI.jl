@@ -26,8 +26,19 @@
 
     @test_throws DimensionMismatch IndustryInfo([1, 2], zeros(Int, 2, 3))
     @test_throws ArgumentError IndustryInfo([1, 2], zeros(Int, 0, 0))
-    @test_throws ArgumentError IndustryInfo([1, 2], [0 1; 2 3])
     @test_throws ArgumentError IndustryInfo([3, 1], zeros(Int, 2, 2))
+end
+
+@testset "Bundled IHS classification" begin
+    classification = ihs_input_classification()
+    @test size(classification) == (616, 616)
+    @test ihs_industry_codes()[[1, end]] == ["0111", "9999"]
+    @test count(==(UInt8(0)), classification) == 269204
+    @test count(==(UInt8(1)), classification) == 45013
+    @test count(==(UInt8(2)), classification) == 65239
+
+    classification[1, 1] = 0
+    @test ihs_input_classification()[1, 1] == 2
 end
 
 @testset "Internal helper functions" begin

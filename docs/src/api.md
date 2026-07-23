@@ -6,7 +6,9 @@
 
 `IndustryInfo(industry_of_firm, essential_industry)` stores one one-based industry id per firm and one Boolean essentiality flag per supplying industry. It is a backwards-compatible shorthand: an essential industry is classified as `2` for every customer industry, and a non-essential industry as `1` for every customer industry.
 
-`IndustryInfo(industry_of_firm, input_classification)` accepts a square integer matrix whose rows are supplying industries and columns are customer industries. Each entry must be `2` (essential), `1` (non-essential), or `0` (no downstream production effect). Matrix indices and `industry_of_firm` must use the same one-based industry numbering. Input links classified as `0` still remain available to upstream propagation.
+`IndustryInfo(industry_of_firm, input_classification)` accepts a square integer matrix whose rows are supplying industries and columns are customer industries. Entries use `2` for essential, `1` for non-essential, and `0` for no downstream production effect. Matrix indices and `industry_of_firm` must use the same one-based industry numbering. Input links classified as `0` still remain available to upstream propagation. Classification values are trusted rather than scanned during construction.
+
+`ihs_input_classification()` returns the bundled 616 by 616 IHS matrix and `ihs_industry_codes()` returns its label order. They are opt-in defaults; `IndustryInfo(industry_of_firm)` remains the all-essential compatibility default.
 
 `ESRIEconomy(W, info)` caches the normalized upstream/downstream operators, row sums, column sums, total output, and firm count.
 
@@ -40,12 +42,14 @@
 
 ## Validation
 
-`BoundsError` covers out-of-range firm ids. `ArgumentError` covers invalid `combine`, invalid `components`, duplicate `firm_indices`, empty classifications, invalid industry ids, and classification entries other than `0`, `1`, or `2`. `DimensionMismatch` covers shape mismatches for `W`, `input_classification`, `final_weights`, and `shock`. `DomainError` covers non-finite or negative `W`, non-finite or negative `final_weights`, and `shock` values outside `[0,1]`.
+`BoundsError` covers out-of-range firm ids. `ArgumentError` covers invalid `combine`, invalid `components`, duplicate `firm_indices`, empty classifications, and invalid industry ids. `DimensionMismatch` covers shape mismatches for `W`, `input_classification`, `final_weights`, and `shock`. `DomainError` covers non-finite or negative `W`, non-finite or negative `final_weights`, and `shock` values outside `[0,1]`.
 
 ```@docs
 IndustryInfo
 ESRIEconomy
 ESRIResult
+ihs_input_classification
+ihs_industry_codes
 ```
 
 ```@docs

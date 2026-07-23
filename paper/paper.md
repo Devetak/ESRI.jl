@@ -47,7 +47,7 @@ Computationally, economy-wide ESRI is expensive because one fixed-point cascade 
 
 # Software design
 
-ESRIcascade.jl is organized around the workflow used in ESRI studies. A user starts from a weighted firm-to-firm network and an industry label for each firm. `IndustryInfo` stores these labels together with either a global essentiality flag for each supplier industry or a customer-specific input-classification matrix; omitting a classification gives the all-essential default. This follows the ESRI production setup, where essential inputs enter through a Leontief part and inessential inputs enter through a linear part [@diem2022esri]. `ESRIEconomy` then stores the normalized upstream and downstream operators, output weights, and network totals. This setup step is separate from the scenario calculation, so the same economy object can be reused for many firm closures, counterfactual networks, or partial shock vectors.
+ESRIcascade.jl is organized around the workflow used in ESRI studies. A user starts from a weighted firm-to-firm network and an industry label for each firm. `IndustryInfo` stores these labels together with either a global essentiality flag for each supplier industry or a customer-specific input-classification matrix; omitting a classification gives the all-essential default. The package also bundles the 616-industry IHS matrix and its label order as an opt-in default. This follows the ESRI production setup, where essential inputs enter through a Leontief part and inessential inputs enter through a linear part [@diem2022esri]. `ESRIEconomy` then stores the normalized upstream and downstream operators, output weights, and network totals. This setup step is separate from the scenario calculation, so the same economy object can be reused for many firm closures, counterfactual networks, or partial shock vectors.
 
 The main user calls compute ESRI scores for all selected firms, solve one firm-closure scenario, or solve a scenario from an explicit capacity vector, where one means normal operation, zero means closure, and intermediate values mean partial capacity. The result can be a single ESRI value or an `ESRIResult` with the converged upstream and downstream states.
 
@@ -61,26 +61,27 @@ These implementation changes preserve the ESRI fixed-point updates and final los
 
 # Benchmark
 
-The benchmark compares ESRIcascade.jl with the Diem et al. R/C++ implementation [@fastcascade] on the same full-economy task. For each network, every firm is closed once and the complete ESRI score vector is computed. The tested networks are sparse synthetic power-law graphs, with the number of links growing in proportion to the number of firms. This gives the benchmark the degree imbalance expected in firm-level supply networks without using confidential firm data.
+The repository contains paired Julia and R benchmark scripts for a one-to-one sparse comparison with the native C++ reference routine in `fastcascade` [@fastcascade]. Both scripts read the same labeled 616 by 616 IHS classification CSV (byte-identical to the bundled asset), use 1,232 firms (two per industry), 9,856 sparse supplier-to-customer links, and the same 16 single-firm closures. Link weights are deterministically generated as `1 + mod(13*supplier + 7*customer, 17)`, with the same eight customer offsets for every supplier. The scripts preserve the reference convention: rows are supplier industries, columns are customer industries, and `p_market=p` enables the same within-industry replacement logic.
 
-Both implementations used 12 threads or workers. The stopping tolerance was `0.01` for both implementations, and the same generated networks were passed to both solvers. The benchmark machine used an Intel Core Ultra 7 155H CPU with 16 cores, 22 logical CPUs, and 24 MiB L3 cache.
+This comparison times the prepared sparse cascade rather than file parsing or operator construction. Julia prepares an `ESRIEconomy` once and times `esri(econ; firm_indices=1:16)`. The R script performs the equivalent GLcascade preprocessing once, drops explicit zero downstream entries to match Julia's sparse storage, and then times `fastcascade::GL_cascade_dynamics_cpp` directly. Both prepared downstream operators contain 3,896 nonzeros. The C++ routine accepts the 16 closures in one native call; Julia's public serial call completes those same 16 scenarios with a reused workspace. Both use one computational thread, tolerance `0.01`, and warmed calls. The Julia capacity vector and the C++ loss vector encode the same closures.
 
-The two implementations matched one-to-one up to numerical precision for this benchmark. Across all reported runs, the largest absolute difference between paired ESRI scores was at most `3e-6`. No nonfinite scores were produced by the R/C++ implementation. On these full-firm sparse graphs, ESRIcascade.jl was about 5.6 to 6.5 times faster.
-
-| Number of firms | ESRIcascade.jl time | Diem et al. implementation time | Speedup |
-| ---: | ---: | ---: | ---: |
-| 10,000 | 8.29 s | 47.17 s | 5.69x |
-| 20,000 | 35.25 s | 197.73 s | 5.61x |
-| 50,000 | 208.85 s | 1362.74 s | 6.53x |
-| 100,000 | 1016.20 s | 6602.74 s | 6.50x |
+The paired scripts compare all 16 scores with an absolute tolerance of `1e-12`. In the local single-thread study, the maximum Julia/C++ discrepancy was `6.11e-15`. Median prepared-solve times were about `0.05 s` for Julia and `2.8 s` for the native C++ routine, a roughly `55x` speedup on this fixed sparse fixture. The scripts report raw medians and parity results so that timing can be rerun on a target machine rather than treated as a hardware-independent constant.
 
 ## Customer-specific classification study
 
-The package also supports the reference R/C++ convention in which input type depends on both the supplying and purchasing industries. The supplied 616 by 616 IHS classification matrix uses rows for supplier industries and columns for customer industries. Each entry is `2` for an essential input, `1` for a non-essential input, or `0` for an input with no short-term downstream production impact. Zero-classified links remain available to upstream shock propagation.
+The package supports the reference convention in which input type depends on both the supplying and purchasing industries. Each IHS-matrix entry is `2` for an essential input, `1` for a non-essential input, or `0` for an input with no short-term downstream production impact. Zero-classified links remain available to upstream propagation. The bundled matrix contains 65,239 essential, 45,013 non-essential, and 269,204 no-short-term-impact classifications.
 
-A compatibility study using this classification matrix evaluated 16 firm-closure scenarios on a network with 1,232 firms and 9,856 edges. The maximum absolute difference between the Julia and C++ ESRI results was `5.995e-15`. The Julia calculation took `0.287 s`, compared with `4.899 s` for C++, corresponding to a `17.1x` speedup.
+The validation study separates the new semantics, legacy compatibility, and sparse execution path.
 
-A separate prepared-economy run on the same 16 scenarios reduced the median serial solve from about `39 ms` to `5 ms` (about `8x`) by reusing the scenario workspace and reducing only touched sparse essential-input cells. The scores were unchanged exactly. This isolates the improvement in the cascade solver from CSV parsing and economy construction.
+| Check | Fixture | Result |
+| --- | --- | --- |
+| Customer-specific denominators | 4 firms, 3 industries, mixed `0`/`1`/`2` inputs | Essential inputs normalize within supplier industry; non-essential inputs normalize over all inputs; class `0` is absent downstream. |
+| Legacy compatibility | 4 firms, 3 industries, Boolean versus row-constant matrix | Dense and sparse impact operators plus the full scenario result are identical. |
+| C++ mixed-classification reference | 6 firms, 3 industries | Downstream-only ESRI is `0.50687988214742541`; states agree to `1e-12`. |
+| Dense--sparse scenario parity | 4 firms, 2 industries, four closures and one partial shock | ESRI and downstream states agree to `1e-12`. |
+| IHS sparse reference | 1,232 firms, 616 industries, 16 closures | Julia/C++ scores agree to `6.11e-15`; the prepared sparse timing is reported above. |
+
+This separates backward compatibility from the new customer-specific semantics while exercising the same sparse route used in the reference comparison.
 
 # Limitations
 

@@ -158,19 +158,6 @@ function _unpermute_values(permuted_values::AbstractVector{T}, perm::AbstractVec
     return values
 end
 
-struct _ESRIWorkspace{T}
-    current_upstream::Vector{T}
-    previous_upstream::Vector{T}
-    current_downstream::Vector{T}
-    previous_downstream::Vector{T}
-    sigmas::Vector{T}
-    essential_matrix::Matrix{T}
-    essential_touched::Vector{Int}
-    temp_sums::Vector{T}
-    nonessential_vector::Vector{T}
-    psi::Vector{T}
-end
-
 function _allocate_workspace(::Type{T}, n::Int, num_inds::Int) where {T}
     return _ESRIWorkspace(
         Vector{T}(undef, n),
@@ -232,22 +219,18 @@ end
 
 function _compute_single_esri!(
     econ::ESRIEconomy{T},
-    current_upstream::Vector{T},
-    previous_upstream::Vector{T},
-    current_downstream::Vector{T},
-    previous_downstream::Vector{T},
-    sigmas::Vector{T},
-    essential_matrix::Matrix{T},
-    essential_touched::Vector{Int},
-    temp_sums::Vector{T},
-    nonessential_vector::Vector{T},
-    psi::Vector{T},
+    workspace::_ESRIWorkspace{T},
     final_weights::AbstractVector{T};
     combine::Symbol = :min,
     maxiter::Int = 100,
     tol::Real = 1e-2,
     verbose::Bool = false,
 ) where {T}
+    current_upstream = workspace.current_upstream
+    previous_upstream = workspace.previous_upstream
+    current_downstream = workspace.current_downstream
+    previous_downstream = workspace.previous_downstream
+    psi = workspace.psi
     oneT = one(T)
     zeroT = zero(T)
     fill!(previous_upstream, oneT)
@@ -258,19 +241,7 @@ function _compute_single_esri!(
         downstream_distance = zeroT
         if downstream_active
             copyto!(current_downstream, previous_downstream)
-            downstream_shock!(
-                econ.downstream_impact_essential,
-                econ.downstream_impact_nonessential,
-                econ.info,
-                econ.row_sums,
-                psi,
-                sigmas,
-                essential_matrix,
-                nonessential_vector,
-                current_downstream,
-                temp_sums,
-                essential_touched,
-            )
+            _downstream_shock!(econ, workspace)
             downstream_distance = _linf_distance(current_downstream, previous_downstream)
         end
 
@@ -300,37 +271,6 @@ function _compute_single_esri!(
     return _reduce_esri(current_upstream, current_downstream, final_weights, combine)
 end
 
-function _solve_default_firm_esri!(
-    econ::ESRIEconomy{T},
-    workspace::_ESRIWorkspace{T},
-    final_weights::AbstractVector{T},
-    firm_idx::Integer,
-    combine::Symbol,
-    maxiter::Int,
-    tol::Real,
-) where {T}
-    _default_shock!(workspace.psi, firm_idx)
-    value = _compute_single_esri!(
-        econ,
-        workspace.current_upstream,
-        workspace.previous_upstream,
-        workspace.current_downstream,
-        workspace.previous_downstream,
-        workspace.sigmas,
-        workspace.essential_matrix,
-        workspace.essential_touched,
-        workspace.temp_sums,
-        workspace.nonessential_vector,
-        workspace.psi,
-        final_weights;
-        combine = combine,
-        maxiter = maxiter,
-        tol = tol,
-        verbose = false,
-    )
-    return _normalize_esri(value, final_weights)
-end
-
 function _solve_default_firm_esri(
     econ::ESRIEconomy{T},
     final_weights::AbstractVector{T},
@@ -338,17 +278,19 @@ function _solve_default_firm_esri(
     combine::Symbol,
     maxiter::Int,
     tol::Real,
+    workspace::_ESRIWorkspace{T} = _allocate_workspace(T, econ.n, num_industries(econ.info)),
 ) where {T}
-    workspace = _allocate_workspace(T, econ.n, num_industries(econ.info))
-    return _solve_default_firm_esri!(
+    _default_shock!(workspace.psi, firm_idx)
+    value = _compute_single_esri!(
         econ,
         workspace,
-        final_weights,
-        firm_idx,
-        combine,
-        maxiter,
-        tol,
+        final_weights;
+        combine = combine,
+        maxiter = maxiter,
+        tol = tol,
+        verbose = false,
     )
+    return _normalize_esri(value, final_weights)
 end
 
 function _economywide_esri(
@@ -384,14 +326,14 @@ function _economywide_esri(
         workspace = _allocate_workspace(T, econ.n, num_industries(econ.info))
 
         for firm_idx in iter_range
-            values[firm_idx] = _solve_default_firm_esri!(
+            values[firm_idx] = _solve_default_firm_esri(
                 econ,
-                workspace,
                 weights,
                 firm_idx,
                 combine,
                 maxiter,
                 tol,
+                workspace,
             )
         end
     end
@@ -411,16 +353,7 @@ function _run_scenario!(
 ) where {T}
     value = _compute_single_esri!(
         econ,
-        workspace.current_upstream,
-        workspace.previous_upstream,
-        workspace.current_downstream,
-        workspace.previous_downstream,
-        workspace.sigmas,
-        workspace.essential_matrix,
-        workspace.essential_touched,
-        workspace.temp_sums,
-        workspace.nonessential_vector,
-        workspace.psi,
+        workspace,
         final_weights;
         combine = combine,
         maxiter = maxiter,

@@ -29,6 +29,19 @@ struct ESRIEconomy{T,I<:IndustryInfo,TU,TD,VT<:AbstractVector{T}}
     n::Int
 end
 
+struct _ESRIWorkspace{T}
+    current_upstream::Vector{T}
+    previous_upstream::Vector{T}
+    current_downstream::Vector{T}
+    previous_downstream::Vector{T}
+    sigmas::Vector{T}
+    essential_matrix::Matrix{T}
+    essential_touched::Vector{Int}
+    temp_sums::Vector{T}
+    nonessential_vector::Vector{T}
+    psi::Vector{T}
+end
+
 """
     ESRIResult
 
@@ -40,90 +53,46 @@ struct ESRIResult{T}
     downstream::Vector{T}
 end
 
-"""
-    IndustryInfo(industry_of_firm::AbstractVector{<:Integer})
-
-Build immutable industry metadata with every supplier-customer industry pair
-classified as essential. The number of industries is inferred from the largest
-industry id.
-"""
 function IndustryInfo(industry_of_firm::AbstractVector{<:Integer})
     isempty(industry_of_firm) && throw(ArgumentError("industry_of_firm must be non-empty"))
-    nindustries = maximum(industry_of_firm)
-    nindustries > 0 || throw(ArgumentError("industry_of_firm values must be positive"))
-    return IndustryInfo(industry_of_firm, trues(nindustries))
+    return IndustryInfo(industry_of_firm, trues(maximum(industry_of_firm)))
 end
 
-"""
-    IndustryInfo(industry_of_firm::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})
+function _industry_indices(industry_of_firm::AbstractVector{<:Integer}, nindustries::Int)
+    nindustries > 0 || throw(ArgumentError("essential_industry must be non-empty"))
+    indices = Int.(industry_of_firm)
+    all(idx -> 1 <= idx <= nindustries, indices) ||
+        throw(ArgumentError("industry_of_firm values must be in 1:length(essential_industry)"))
+    return indices
+end
 
-Build immutable industry metadata for ESRI.
-`industry_of_firm[i]` is the 1-based industry id of firm `i`.
-`essential_industry[k]` marks whether industry `k` is essential.
-"""
 function IndustryInfo(
     industry_of_firm::AbstractVector{<:Integer},
     essential_industry::AbstractVector{Bool},
 )
-    if isempty(essential_industry)
-        throw(ArgumentError("essential_industry must be non-empty"))
-    end
-
     nindustries = length(essential_industry)
-    input_classification = Matrix{UInt8}(undef, nindustries, nindustries)
-    @inbounds for supplier_industry in 1:nindustries
-        fill!(
-            @view(input_classification[supplier_industry, :]),
-            essential_industry[supplier_industry] ? UInt8(2) : UInt8(1),
-        )
-    end
-    return IndustryInfo(industry_of_firm, input_classification)
+    return IndustryInfo(
+        industry_of_firm,
+        repeat(UInt8.(essential_industry) .+ UInt8(1), 1, nindustries),
+    )
 end
 
-"""
-    IndustryInfo(industry_of_firm::AbstractVector{<:Integer}, input_classification::AbstractMatrix{<:Integer})
-
-Build immutable industry metadata with a supplier-industry by customer-industry
-classification matrix. Entries must be `0`, `1`, or `2`.
-"""
 function IndustryInfo(
     industry_of_firm::AbstractVector{<:Integer},
     input_classification::AbstractMatrix{<:Integer},
 )
     nindustries, ncustomers = size(input_classification)
-    nindustries == ncustomers || throw(DimensionMismatch("input_classification must be square"))
-    nindustries > 0 || throw(ArgumentError("input_classification must be non-empty"))
-
-    firm_industry = Vector{Int}(undef, length(industry_of_firm))
-    @inbounds for i in eachindex(industry_of_firm)
-        idx = Int(industry_of_firm[i])
-        if idx < 1 || idx > nindustries
-            throw(ArgumentError("industry_of_firm values must be in 1:size(input_classification, 1)"))
-        end
-        firm_industry[i] = idx
-    end
-
-    classification = Matrix{UInt8}(undef, nindustries, nindustries)
-    essential_industry_vec = Vector{Bool}(undef, nindustries)
-    @inbounds for supplier_industry in 1:nindustries
-        universally_essential = true
-        for customer_industry in 1:nindustries
-            value = input_classification[supplier_industry, customer_industry]
-            if value != 0 && value != 1 && value != 2
-                throw(ArgumentError("input_classification entries must be 0, 1, or 2"))
-            end
-            classification[supplier_industry, customer_industry] = UInt8(value)
-            universally_essential &= value == 2
-        end
-        essential_industry_vec[supplier_industry] = universally_essential
-    end
-
-    essential_firm = Vector{Bool}(undef, length(firm_industry))
-    @inbounds for i in eachindex(firm_industry)
-        essential_firm[i] = essential_industry_vec[firm_industry[i]]
-    end
-
-    return IndustryInfo(firm_industry, essential_industry_vec, essential_firm, classification)
+    nindustries == ncustomers ||
+        throw(DimensionMismatch("input_classification must be square"))
+    classification = Matrix{UInt8}(input_classification)
+    essential_industry = vec(all(==(UInt8(2)), classification; dims = 2))
+    firm_industry = _industry_indices(industry_of_firm, nindustries)
+    return IndustryInfo(
+        firm_industry,
+        essential_industry,
+        essential_industry[firm_industry],
+        classification,
+    )
 end
 
 Base.length(info::IndustryInfo) = length(info.industry_of_firm)

@@ -32,7 +32,7 @@ end
 
     scalar = esri_shock(econ, psi; final_weights = weights, maxiter = 100, tol = 1e-12)
     detail = esri_shock(econ, psi; final_weights = weights, details = true, maxiter = 100, tol = 1e-12)
-    expected = sum(weights .* (1 .- min.(detail.upstream, detail.downstream))) / econ.total_output
+    expected = sum(weights .* (1 .- min.(detail.upstream, detail.downstream))) / sum(weights)
 
     @test scalar ≈ expected atol = 1e-12 rtol = 0
     @test detail.esri ≈ expected atol = 1e-12 rtol = 0

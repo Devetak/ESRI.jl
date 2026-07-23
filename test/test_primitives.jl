@@ -88,6 +88,7 @@ end
             2 2 2
         ],
     )
+    @test legacy.input_classification == classified.input_classification
 
     for weights in (W, sparse(W))
         legacy_essential, legacy_nonessential = ESRIcascade.compute_downstream_impact_matrices(weights, legacy)
@@ -96,9 +97,14 @@ end
         @test Matrix(classified_nonessential) == Matrix(legacy_nonessential)
     end
 
+    legacy_econ = ESRIEconomy(sparse(W), legacy)
+    classified_econ = ESRIEconomy(sparse(W), classified)
+    @test esri(classified_econ; maxiter = 60, tol = 1e-10) ==
+          esri(legacy_econ; maxiter = 60, tol = 1e-10)
+
     shock = [0.0, 1.0, 0.6, 1.0]
-    legacy_result = esri_shock(ESRIEconomy(sparse(W), legacy), shock; details = true, maxiter = 60, tol = 1e-10)
-    classified_result = esri_shock(ESRIEconomy(sparse(W), classified), shock; details = true, maxiter = 60, tol = 1e-10)
+    legacy_result = esri_shock(legacy_econ, shock; details = true, maxiter = 60, tol = 1e-10)
+    classified_result = esri_shock(classified_econ, shock; details = true, maxiter = 60, tol = 1e-10)
     @test classified_result.esri == legacy_result.esri
     @test classified_result.upstream == legacy_result.upstream
     @test classified_result.downstream == legacy_result.downstream
@@ -122,9 +128,13 @@ end
         ],
     )
 
+    dense_econ = ESRIEconomy(W, info)
     econ = ESRIEconomy(sparse(W), info)
     permuted = ESRIcascade._permute_sparse_economy(econ, [2, 1, 3, 4, 5, 6])
     @test permuted.info.input_classification == info.input_classification
+
+    @test esri(econ; combine = :downstream, maxiter = 150, tol = 1e-12) ≈
+          esri(dense_econ; combine = :downstream, maxiter = 150, tol = 1e-12) atol = 1e-12 rtol = 0
 
     result = esri(econ, 1; details = true, combine = :downstream, maxiter = 150, tol = 1e-12)
     @test result.esri ≈ 0.50687988214742541 atol = 1e-12 rtol = 0

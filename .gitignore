@@ -79,8 +79,10 @@ Temporary Items
 
 data/*
 !data/README.md
+!data/LICENSE.md
 !data/ihs_classification.bin
 !data/ihs_industry_codes.txt
+!data/verify_zenodo_ihs.jl
 results/
 output.txt
 esris.txt

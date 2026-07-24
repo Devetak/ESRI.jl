@@ -175,12 +175,12 @@ Let `w_i` be the final weights. The package default is `w_i = r_i`. The reported
 
 ```math
 \mathrm{ESRI} =
-\frac{\sum_{i=1}^N w_i (1 - f_i)}{\sum_{i=1}^N r_i}.
+\frac{\sum_{i=1}^N w_i (1 - f_i)}{\sum_{i=1}^N w_i}.
 ```
 
-If `\sum_i r_i = 0`, the package returns the unnormalized numerator.
+If `\sum_i w_i = 0`, the package returns the unnormalized numerator.
 
-With the default `w_i = r_i`, this is a share of total output. If custom `final_weights` are supplied, the denominator becomes `\sum_i w_i`, so the scalar is a weighted average loss under those weights.
+With the default `w_i = r_i`, this is a share of total output. With custom `final_weights`, it is a weighted average loss under those weights.
 
 ## Relation to the paper
 

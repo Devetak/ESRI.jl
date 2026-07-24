@@ -18,6 +18,11 @@ firms_per_industry <- n %/% m
 extra_firms <- n %% m
 p_cons <- c(rep(seq_len(m), each = firms_per_industry), seq_len(extra_firms))
 p <- rownames(E)[p_cons]
+closure_industries <- as.integer(round(seq(1L, m, length.out = 16L)))
+closure_firms <- as.integer(
+  (closure_industries - 1L) * firms_per_industry + 1L
+)
+stopifnot(length(unique(closure_firms)) == 16L, all(p_cons[closure_firms] == closure_industries))
 offsets <- c(1L, 37L, 91L, 173L, 311L, 509L, 701L, 997L)
 supplier <- rep(seq_len(n), each = length(offsets))
 customer <- unlist(lapply(seq_len(n), function(i) ((i + offsets - 1L) %% n) + 1L), use.names = FALSE)
@@ -38,7 +43,7 @@ unique_E <- unique(E, MARGIN = 2L)
 profile <- vapply(seq_len(m), function(j) {
   which(vapply(seq_len(ncol(unique_E)), function(k) identical(E[, j], unique_E[, k]), logical(1)))[1]
 }, integer(1))
-psi <- sparseMatrix(i = seq_len(16L), j = seq_len(16L), x = 1, dims = c(n, 16L))
+psi <- sparseMatrix(i = closure_firms, j = seq_len(16L), x = 1, dims = c(n, 16L))
 zero_sector <- sparseMatrix(i = integer(), j = integer(), x = numeric(), dims = c(n, 1L))
 
 run_cpp <- function() fastcascade::GL_cascade_dynamics_cpp(
@@ -49,10 +54,10 @@ run_cpp <- function() fastcascade::GL_cascade_dynamics_cpp(
 )
 
 cpp_scores <- c(
-  0.87837245554794330, 0.87825862250992404, 0.87664923655232285, 0.87566688889824862,
-  0.87524585194239457, 0.87433651919608424, 0.86060405584903987, 0.84701627242865141,
-  0.85599031156433647, 0.85741739269669437, 0.85466742541113849, 0.85393912577670528,
-  0.84935069451138689, 0.77626516574715354, 0.84447307983109421, 0.84456652158172307
+  0.87837245554794330, 0.83928173885048851, 0.84026525189212131, 0.010491619358180508,
+  0.83938875684430192, 0.83919913726570627, 0.83871134521356561, 0.83862604469123081,
+  0.83842687824673123, 0.14782516685618610, 0.013224577635286240, 0.0064115243633385468,
+  0.0046717737458951943, 0.83930463691132073, 0.011700530446422091, 0.0086842594773570356
 )
 
 invisible(run_cpp())
@@ -61,12 +66,15 @@ reference_path <- Sys.getenv("ESRI_REFERENCE_SCORES", "")
 if (nzchar(reference_path)) {
   write.table(scores, file = reference_path, sep = ",", row.names = FALSE, col.names = FALSE, quote = FALSE)
 }
+if (n == 2L * m) {
+  cat("cpp_scores=", paste(formatC(scores, digits = 17, format = "g"), collapse = ","), "\n", sep = "")
+}
 samples <- vapply(
   seq_len(as.integer(Sys.getenv("ESRI_BENCHMARK_SAMPLES", "5"))),
   function(i) system.time(invisible(run_cpp()))[["elapsed"]],
   numeric(1)
 )
-cat("firms=", n, " industries=", m, " edges=", length(W@x), " closures=16\n", sep = "")
+cat("firms=", n, " industries=", m, " edges=", length(W@x), " closures=16 closure_firms=", paste(closure_firms, collapse = ","), "\n", sep = "")
 cat("downstream_nnz=", length(Lambda_d@x), "\n", sep = "")
 cat("cpp_prepared_median_s=", median(samples), "\n", sep = "")
 if (n == 2L * m) {

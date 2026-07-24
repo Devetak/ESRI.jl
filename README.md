@@ -73,6 +73,7 @@ mapping firm data to one-based ids, then remove the labels before construction:
 ```julia
 raw = readdlm("EssMatIHS.csv", ',', String)
 industry_codes = raw[1, 2:end]
+industry_codes == raw[2:end, 1] || error("row and column industry codes must have the same order")
 input_classification = parse.(UInt8, raw[2:end, 2:end])
 industry_id = Dict(code => i for (i, code) in pairs(industry_codes))
 info = IndustryInfo([industry_id[code] for code in firm_industry_codes], input_classification)
@@ -120,4 +121,5 @@ Diem, C. et al. *Quantifying firm-level economic systemic risk from nation-wide 
 
 ## License
 
-ESRIcascade.jl is open source and released under the MIT License. See `LICENSE` for details.
+ESRIcascade.jl code is released under the MIT License. The bundled IHS matrix
+and labels are separately CC BY 4.0; see `data/LICENSE.md` for attribution.

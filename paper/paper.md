@@ -47,7 +47,7 @@ Computationally, economy-wide ESRI is expensive because one fixed-point cascade 
 
 # Software design
 
-ESRIcascade.jl is organized around the workflow used in ESRI studies. A user starts from a weighted firm-to-firm network and an industry label for each firm. `IndustryInfo` stores these labels together with either a global essentiality flag for each supplier industry or a customer-specific input-classification matrix; omitting a classification gives the all-essential default. The package also bundles the 616-industry IHS matrix and its label order as an opt-in default. This follows the ESRI production setup, where essential inputs enter through a Leontief part and inessential inputs enter through a linear part [@diem2022esri]. `ESRIEconomy` then stores the normalized upstream and downstream operators, output weights, and network totals. This setup step is separate from the scenario calculation, so the same economy object can be reused for many firm closures, counterfactual networks, or partial shock vectors.
+ESRIcascade.jl is organized around the workflow used in ESRI studies. A user starts from a weighted firm-to-firm network and an industry label for each firm. `IndustryInfo` stores these labels together with either a global essentiality flag for each supplier industry or a customer-specific input-classification matrix; omitting a classification gives the all-essential default. The package also bundles the 616-industry IHS matrix and its label order as an opt-in default, derived from the CC BY 4.0 replication archive of Pichler et al. [@pichler2022zenodo]. This follows the ESRI production setup, where essential inputs enter through a Leontief part and inessential inputs enter through a linear part [@diem2022esri]. `ESRIEconomy` then stores the normalized upstream and downstream operators, output weights, and network totals. This setup step is separate from the scenario calculation, so the same economy object can be reused for many firm closures, counterfactual networks, or partial shock vectors.
 
 The main user calls compute ESRI scores for all selected firms, solve one firm-closure scenario, or solve a scenario from an explicit capacity vector, where one means normal operation, zero means closure, and intermediate values mean partial capacity. The result can be a single ESRI value or an `ESRIResult` with the converged upstream and downstream states.
 
@@ -61,21 +61,21 @@ These implementation changes preserve the ESRI fixed-point updates and final los
 
 # Benchmark
 
-The repository contains paired Julia and R benchmark scripts for a one-to-one sparse comparison with the native C++ reference routine in `fastcascade` [@fastcascade]. Both scripts read the same labeled 616 by 616 IHS classification CSV (byte-identical to the bundled asset), use 1,232 firms (two per industry), 9,856 sparse supplier-to-customer links, and the same 16 single-firm closures. Link weights are deterministically generated as `1 + mod(13*supplier + 7*customer, 17)`, with the same eight customer offsets for every supplier. The scripts preserve the reference convention: rows are supplier industries, columns are customer industries, and `p_market=p` enables the same within-industry replacement logic.
+The repository contains paired Julia and R benchmark scripts for a one-to-one sparse comparison with the native C++ reference routine in `fastcascade` [@fastcascade]. Both scripts read the same labeled 616 by 616 IHS classification CSV, use 1,232 firms (two per industry), 9,856 sparse supplier-to-customer links, and the same 16 single-firm closures. Link weights are deterministically generated as `1 + mod(13*supplier + 7*customer, 17)`, with the same eight customer offsets for every supplier. The scripts preserve the reference convention: rows are supplier industries, columns are customer industries, and `p_market=p` enables the same within-industry replacement logic.
 
-This comparison times the prepared sparse cascade rather than file parsing or operator construction. Julia prepares an `ESRIEconomy` once and times `esri(econ; firm_indices=1:16)`. The R script performs the equivalent GLcascade preprocessing once, drops explicit zero downstream entries to match Julia's sparse storage, and then times `fastcascade::GL_cascade_dynamics_cpp` directly. Both prepared downstream operators contain 3,896 nonzeros. The C++ routine accepts the 16 closures in one native call; Julia's public serial call completes those same 16 scenarios with a reused workspace. Both use one computational thread, tolerance `0.01`, and warmed calls. The Julia capacity vector and the C++ loss vector encode the same closures.
+This comparison times the prepared sparse cascade rather than file parsing or operator construction. Julia prepares an `ESRIEconomy` once and times 16 closures spread evenly across the 616 industries. The R script performs the equivalent GLcascade preprocessing once, drops explicit zero downstream entries to match Julia's sparse storage, and then times `fastcascade::GL_cascade_dynamics_cpp` directly. Both prepared downstream operators contain 3,896 nonzeros. The C++ routine accepts the 16 closures in one native call; Julia's public serial call completes those same 16 scenarios with a reused workspace. Both use one computational thread, tolerance `0.01`, and warmed calls. The Julia capacity vector and the C++ loss vector encode the same closures.
 
-The paired scripts compare all 16 scores with an absolute tolerance of `1e-12`. Table 1 reports five warmed, single-thread samples on the local machine. It includes the 1,232-firm fixture and the `10,000`, `20,000`, `50,000`, and `100,000` paper-scale sizes selected through `ESRI_BENCHMARK_FIRMS`. For the larger fixtures, the C++ script writes the 16 native scores first and Julia must reproduce them before a timing is reported. The maximum discrepancy across this study was `6.00e-15`.
+The paired scripts compare all 16 scores with an absolute tolerance of `1e-12`. Table 1 reports five warmed, single-thread samples on the local machine. It includes the 1,232-firm fixture and the `10,000`, `20,000`, `50,000`, and `100,000` paper-scale sizes selected through `ESRI_BENCHMARK_FIRMS`. For the larger fixtures, the C++ script writes the 16 native scores first and Julia must reproduce them before a timing is reported. The maximum discrepancy across this study was `2.78e-15`.
 
 | Firms | Links | Downstream nonzeros | Julia median (s) | Native C++ median (s) | C++ / Julia | Max. absolute difference |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,232 | 9,856 | 3,896 | 0.04894 | 2.789 | 57.0x | 6.00e-15 |
-| 10,000 | 80,000 | 49,993 | 0.01590 | 0.978 | 61.5x | 2.68e-16 |
-| 20,000 | 160,000 | 113,259 | 0.02960 | 2.345 | 79.2x | 3.16e-16 |
-| 50,000 | 400,000 | 333,434 | 0.07838 | 7.157 | 91.3x | 3.30e-16 |
-| 100,000 | 800,000 | 725,178 | 0.15898 | 13.698 | 86.2x | 3.37e-16 |
+| 1,232 | 9,856 | 3,896 | 0.01970 | 1.404 | 71.3x | 2.78e-15 |
+| 10,000 | 80,000 | 49,993 | 0.01470 | 1.039 | 70.7x | 2.86e-16 |
+| 20,000 | 160,000 | 113,259 | 0.02824 | 1.973 | 69.9x | 2.83e-16 |
+| 50,000 | 400,000 | 333,434 | 0.08150 | 6.207 | 76.2x | 3.30e-16 |
+| 100,000 | 800,000 | 725,178 | 0.13967 | 12.281 | 87.9x | 2.94e-16 |
 
-These are prepared-solve times for the same 16 sparse closures, rather than an all-firm ESRI vector. They are local hardware measurements, not hardware-independent constants; the scripts report raw medians and parity so the study can be reproduced on a target machine.
+These are prepared-solve times for the same 16 sparse closures, rather than an all-firm ESRI vector. The table is a local timing snapshot, not a current or hardware-independent constant; run the scripts for fresh medians and parity on a target machine.
 
 ## Customer-specific classification study
 
@@ -87,9 +87,9 @@ The validation study separates the new semantics, legacy compatibility, and spar
 | --- | --- | --- |
 | Customer-specific denominators | 4 firms, 3 industries, mixed `0`/`1`/`2` inputs | Essential inputs normalize within supplier industry; non-essential inputs normalize over all inputs; class `0` is absent downstream. |
 | Legacy compatibility | 4 firms, 3 industries, Boolean versus row-constant matrix | Dense and sparse impact operators plus the full scenario result are identical. |
-| C++ mixed-classification reference | 6 firms, 3 industries | Downstream-only ESRI is `0.50687988214742541`; states agree to `1e-12`. |
+| C++ mixed-classification reference | 6 firms, 3 industries | Downstream-only ESRI is `0.50687988214742541`; downstream state agrees to `1e-12`. |
 | Dense--sparse scenario parity | 4 firms, 2 industries, four closures and one partial shock | ESRI and downstream states agree to `1e-12`. |
-| IHS sparse reference | 1,232 firms, 616 industries, 16 closures | Julia/C++ scores agree to `6.11e-15`; the prepared sparse timing is reported above. |
+| IHS sparse reference | 1,232 firms, 616 industries, 16 closures | Julia/C++ scores agree to `2.78e-15`; the prepared sparse timing is reported above. |
 
 This separates backward compatibility from the new customer-specific semantics while exercising the same sparse route used in the reference comparison.
 

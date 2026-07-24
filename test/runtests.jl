@@ -1,5 +1,6 @@
 using Test
 using Random
+using SHA
 using SparseArrays
 using LinearAlgebra: I, BLAS
 

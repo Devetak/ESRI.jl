@@ -108,6 +108,11 @@ end
     @test classified_result.esri == legacy_result.esri
     @test classified_result.upstream == legacy_result.upstream
     @test classified_result.downstream == legacy_result.downstream
+
+    default_econ = ESRIEconomy(sparse(W), IndustryInfo(industries))
+    explicit_default_econ = ESRIEconomy(sparse(W), IndustryInfo(industries, fill(2, 3, 3)))
+    @test esri(default_econ; maxiter = 60, tol = 1e-10) ==
+          esri(explicit_default_econ; maxiter = 60, tol = 1e-10)
 end
 
 @testset "C++ mixed-classification parity" begin

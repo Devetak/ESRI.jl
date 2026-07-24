@@ -4,13 +4,16 @@
     IndustryInfo(industry_of_firm)
 
 Firm industry ids and input classifications. `input_classification[supplier, customer]`
-is `0` (no downstream impact), `1` (nonessential), or `2` (essential).
+is `0` (no downstream impact), `1` (nonessential), or `2` (essential). The
+legacy `essential_industry` and `essential_firm` fields remain for compatibility;
+with matrix-based customer-specific classifications they are true only for rows
+consisting entirely of `2`s.
 """
-struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool},TC<:AbstractMatrix{UInt8}}
+struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
     industry_of_firm::TI
     essential_industry::TB
     essential_firm::TB
-    input_classification::TC
+    input_classification::Matrix{UInt8}
 end
 
 """
@@ -71,10 +74,39 @@ function IndustryInfo(
     essential_industry::AbstractVector{Bool},
 )
     nindustries = length(essential_industry)
-    return IndustryInfo(
+    firm_industry = _industry_indices(industry_of_firm, nindustries)
+    essential_industry = Vector{Bool}(essential_industry)
+    return IndustryInfo(firm_industry, essential_industry, essential_industry[firm_industry])
+end
+
+# Keep the pre-classification three-field constructor usable.  Its matrix view
+# has the same row-constant 2/1 semantics as the old Boolean API.
+function IndustryInfo{TI,TB}(
+    industry_of_firm::TI,
+    essential_industry::TB,
+    essential_firm::TB,
+) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
+    nindustries = length(essential_industry)
+    return IndustryInfo{TI,TB}(
         industry_of_firm,
+        essential_industry,
+        essential_firm,
         repeat(UInt8.(essential_industry) .+ UInt8(1), 1, nindustries),
     )
+end
+
+IndustryInfo(
+    industry_of_firm::TI,
+    essential_industry::TB,
+    essential_firm::TB,
+) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}} =
+    IndustryInfo{TI,TB}(industry_of_firm, essential_industry, essential_firm)
+
+function IndustryInfo(
+    industry_of_firm::AbstractVector{<:Integer},
+    input_classification::AbstractMatrix{Bool},
+)
+    throw(ArgumentError("Boolean input_classification is ambiguous; use integer codes 0, 1, and 2"))
 end
 
 function IndustryInfo(

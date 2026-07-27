@@ -42,7 +42,6 @@ info = IndustryInfo(rand(1:4, N), [true, true, false, false]) # industry 1 and 2
 
 econ = ESRIEconomy(W, info) # set up the economy
 scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
-nothing
 ```
 
 ## Essential and non-essential inputs
@@ -81,8 +80,6 @@ In the production function:
 - `1`: non-essential input in the linear part of the production function.
 - `2`: essential input in the Leontief part of the production function.
 
-The codes are categories, not numeric weights: `2` does not mean twice `1`.
-
 Example score distribution from the same kind of run:
 
 ![Histogram of example ESRI scores](docs/src/assets/scores_hist.svg)
@@ -97,7 +94,7 @@ Build `ESRIEconomy` once and reuse it on the same network.
 - `esri(econ, firm_idx; ...)` solves one scenario and returns a scalar, a named tuple, or `ESRIResult`.
 - `esri_shock(econ, psi; ...)` solves one scenario from an explicit capacity cap vector `psi ∈ [0,1]^N`.
 - `final_weights` replaces the weights in the final ESRI reduction. With custom weights, the scalar is the weighted loss divided by `sum(final_weights)`.
-- `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. It does not add a second shock on top.
+- `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. 
 
 ## Sparse C++ reference benchmark
 

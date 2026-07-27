@@ -45,51 +45,43 @@ scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
 nothing
 ```
 
-If every input is essential, omit the classification: `IndustryInfo(rand(1:4, N))`.
+## Essential and non-essential inputs
 
-For customer-specific input requirements, pass a `0`/`1`/`2` matrix instead. Rows
-are supplier industries and columns are customer industries: `2` is essential, `1`
-is non-essential, and `0` has no downstream production effect (but remains in the
-upstream network). The Boolean-vector form above remains a shorthand for using the
-same classification for every customer industry.
+Choose one input classification, then use the same `econ` and `esri` call:
 
 ```julia
-input_classification = [2 1 0; 0 2 1; 1 0 2]
-info = IndustryInfo(rand(1:3, N), input_classification)
-```
-
-For an arbitrary user-supplied matrix, CSV loading stays with the caller; for a
-numeric, header-free CSV, Julia's standard library is enough:
-
-```julia
-using DelimitedFiles
-input_classification = readdlm("input_classification.csv", ',', Int)
-info = IndustryInfo(industry_of_firm, input_classification)
-```
-
-For a labeled matrix such as `EssMatIHS.csv`, retain the industry-code order when
-mapping firm data to one-based ids, then remove the labels before construction:
-
-```julia
-raw = readdlm("EssMatIHS.csv", ',', String)
-industry_codes = raw[1, 2:end]
-industry_codes == raw[2:end, 1] || error("row and column industry codes must have the same order")
-input_classification = parse.(UInt8, raw[2:end, 2:end])
-industry_id = Dict(code => i for (i, code) in pairs(industry_codes))
-info = IndustryInfo([industry_id[code] for code in firm_industry_codes], input_classification)
-```
-
-The IHS matrix is also bundled as a compact default asset, without changing the
-existing all-essential `IndustryInfo(industry_of_firm)` default:
-
-```julia
-industry_codes = ihs_industry_codes()
-industry_id = Dict(code => i for (i, code) in pairs(industry_codes))
-info = IndustryInfo(
-    [industry_id[code] for code in firm_industry_codes],
-    ihs_input_classification(),
+# 1. Old essential/non-essential behavior, using the new matrix API.
+industry_of_firm = rand(1:4, N)
+essential_industry = [true, true, false, false]
+input_classification = repeat(
+    UInt8.(essential_industry) .+ UInt8(1),
+    1,
+    length(essential_industry),
 )
+info = IndustryInfo(industry_of_firm, input_classification)
+
+# 2. Bundled IHS matrix: no file loading required.
+# codes = ihs_industry_codes()
+# industry_id = Dict(code => i for (i, code) in pairs(codes))
+# industry_of_firm = [industry_id[code] for code in firm_industry_codes]
+# info = IndustryInfo(industry_of_firm, ihs_input_classification())
+
+# 3. Custom matrix: rows = suppliers, columns = customers.
+# input_classification = [2 1 0; 0 2 1; 1 0 2]
+# industry_of_firm = rand(1:3, N)
+# info = IndustryInfo(industry_of_firm, input_classification)
+
+econ = ESRIEconomy(W, info)
+scores = esri(econ)
 ```
+
+In the production function:
+
+- `0`: not relevant for production.
+- `1`: non-essential input in the linear part of the production function.
+- `2`: essential input in the Leontief part of the production function.
+
+The codes are categories, not numeric weights: `2` does not mean twice `1`.
 
 Example score distribution from the same kind of run:
 

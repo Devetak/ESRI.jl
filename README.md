@@ -60,10 +60,10 @@ input_classification = repeat(
 info = IndustryInfo(industry_of_firm, input_classification)
 
 # 2. Bundled IHS matrix: no file loading required.
-# codes = ihs_industry_codes()
-# industry_id = Dict(code => i for (i, code) in pairs(codes))
-# industry_of_firm = [industry_id[code] for code in firm_industry_codes]
-# info = IndustryInfo(industry_of_firm, ihs_input_classification())
+# codes = ihs_industry_codes() # ["0111", "0112", ..., "9999"]
+# industry_id = Dict(code => i for (i, code) in pairs(codes)) # "0111" => 1, "0112" => 2, ...
+# industry_of_firm = [industry_id[code] for code in firm_industry_codes] # e.g. ["0111", "0112", ...] -> [1, 2, ...]
+# info = IndustryInfo(industry_of_firm, ihs_input_classification()) # use the bundled 616 x 616 matrix
 
 # 3. Custom matrix: rows = suppliers, columns = customers.
 # input_classification = [2 1 0; 0 2 1; 1 0 2]

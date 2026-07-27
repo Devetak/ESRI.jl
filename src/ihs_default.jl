@@ -17,8 +17,8 @@ function ihs_input_classification()
     length(bytes) == 4 + n + n * profiles || error("invalid bundled IHS classification")
 
     classification = Matrix{UInt8}(undef, n, n)
-    @inbounds for customer in 1:n
-        profile = Int(bytes[4 + customer])
+    @inbounds for customer = 1:n
+        profile = Int(bytes[4+customer])
         source = 5 + n + profile * n
         copyto!(classification, (customer - 1) * n + 1, bytes, source, n)
     end

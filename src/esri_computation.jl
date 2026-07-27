@@ -27,8 +27,9 @@ function _validate_combine(combine::Symbol)
 end
 
 function _validate_components(components::Symbol)
-    components in (:none, :upstream, :downstream, :both) ||
-        throw(ArgumentError("components must be one of :none, :upstream, :downstream, :both"))
+    components in (:none, :upstream, :downstream, :both) || throw(
+        ArgumentError("components must be one of :none, :upstream, :downstream, :both"),
+    )
     return components
 end
 
@@ -40,13 +41,19 @@ function _coerce_weights(
         return row_sums
     end
     n = length(row_sums)
-    length(final_weights) == n || throw(DimensionMismatch("final_weights must have length n"))
+    length(final_weights) == n ||
+        throw(DimensionMismatch("final_weights must have length n"))
     weights = Vector{T}(undef, n)
     zeroT = zero(T)
     @inbounds for i in eachindex(weights)
         raw = final_weights[i]
         if !isfinite(raw) || raw < zeroT
-            throw(DomainError(final_weights[i], "final_weights values must be finite and nonnegative"))
+            throw(
+                DomainError(
+                    final_weights[i],
+                    "final_weights values must be finite and nonnegative",
+                ),
+            )
         end
         weights[i] = T(raw)
     end
@@ -54,7 +61,8 @@ function _coerce_weights(
 end
 
 function _fill_shock!(psi::AbstractVector{T}, shock::AbstractVector{<:Real}) where {T}
-    length(shock) == length(psi) || throw(DimensionMismatch("shock vector must have length n"))
+    length(shock) == length(psi) ||
+        throw(DimensionMismatch("shock vector must have length n"))
     oneT = one(T)
     zeroT = zero(T)
     @inbounds for i in eachindex(psi, shock)
@@ -82,12 +90,12 @@ function _reduce_esri(
     current_upstream::AbstractVector{T},
     current_downstream::AbstractVector{T},
     final_weights::AbstractVector{T},
-    combine::Symbol
+    combine::Symbol,
 ) where {T}
     oneT = one(T)
     acc = zero(T)
     n = length(current_upstream)
-    @inbounds for j in 1:n
+    @inbounds for j = 1:n
         f = if combine === :min
             min(current_upstream[j], current_downstream[j])
         elseif combine === :upstream
@@ -106,7 +114,7 @@ function _csr_row_lengths(matrix::SparseMatrixCSR)
     rowptr = matrix.rowptr
     lengths = Vector{Int}(undef, length(rowptr) - 1)
     @inbounds for i in eachindex(lengths)
-        lengths[i] = rowptr[i + 1] - rowptr[i]
+        lengths[i] = rowptr[i+1] - rowptr[i]
     end
     return lengths
 end
@@ -126,8 +134,9 @@ function _supports_degree_permutation(econ::ESRIEconomy)
 end
 
 function _degree_desc_permutation(econ::ESRIEconomy)
-    out_degree = _csr_row_lengths(econ.downstream_impact_essential) .+
-                 _csr_row_lengths(econ.downstream_impact_nonessential)
+    out_degree =
+        _csr_row_lengths(econ.downstream_impact_essential) .+
+        _csr_row_lengths(econ.downstream_impact_nonessential)
     in_degree = _row_counts(econ.upstream_impact.rowval, econ.n)
     score = out_degree .+ in_degree
     return sortperm(1:econ.n; by = i -> (-score[i], i))
@@ -150,7 +159,10 @@ function _permute_sparse_economy(econ::ESRIEconomy, perm::AbstractVector{Int})
     )
 end
 
-function _unpermute_values(permuted_values::AbstractVector{T}, perm::AbstractVector{Int}) where {T}
+function _unpermute_values(
+    permuted_values::AbstractVector{T},
+    perm::AbstractVector{Int},
+) where {T}
     values = similar(permuted_values)
     @inbounds for i in eachindex(perm)
         values[perm[i]] = permuted_values[i]
@@ -269,7 +281,11 @@ function _solve_default_firm_esri(
     combine::Symbol,
     maxiter::Int,
     tol::Real,
-    workspace::_ESRIWorkspace{T} = _allocate_workspace(T, econ.n, num_industries(econ.info)),
+    workspace::_ESRIWorkspace{T} = _allocate_workspace(
+        T,
+        econ.n,
+        num_industries(econ.info),
+    ),
 ) where {T}
     _default_shock!(workspace.psi, firm_idx)
     value = _compute_single_esri!(
@@ -398,7 +414,16 @@ function esri(
         return _unpermute_values(permuted_values, perm)
     end
 
-    return _economywide_esri(econ, weights, firm_sel, threads, verbose, combine, maxiter, tol)
+    return _economywide_esri(
+        econ,
+        weights,
+        firm_sel,
+        threads,
+        verbose,
+        combine,
+        maxiter,
+        tol,
+    )
 end
 
 """

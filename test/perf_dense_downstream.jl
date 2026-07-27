@@ -41,9 +41,9 @@ end
 
 function median_elapsed(f; samples::Int = 9, reps::Int = 15)
     times = Vector{Float64}(undef, samples)
-    for s in 1:samples
+    for s = 1:samples
         t0 = time_ns()
-        for _ in 1:reps
+        for _ = 1:reps
             f()
         end
         times[s] = (time_ns() - t0) / 1e9
@@ -58,7 +58,8 @@ function main()
 
     W = rand(n, n)
     info = IndustryInfo(rand(1:num_industries, n), rand(Bool, num_industries))
-    essential_impact, nonessential_impact = ESRIcascade.compute_downstream_impact_matrices(W, info)
+    essential_impact, nonessential_impact =
+        ESRIcascade.compute_downstream_impact_matrices(W, info)
 
     downstream = rand(n)
     sigmas_base = rand(n)
@@ -69,37 +70,41 @@ function main()
     nv_new = zeros(n)
     sigmas = similar(sigmas_base)
 
-    old_call! = () -> begin
-        copyto!(sigmas, sigmas_base)
-        old_accumulate_downstream_components!(
-            em_old,
-            nv_old,
-            downstream,
-            sigmas,
-            essential_impact,
-            nonessential_impact,
-            info,
-        )
-    end
+    old_call! =
+        () -> begin
+            copyto!(sigmas, sigmas_base)
+            old_accumulate_downstream_components!(
+                em_old,
+                nv_old,
+                downstream,
+                sigmas,
+                essential_impact,
+                nonessential_impact,
+                info,
+            )
+        end
 
-    new_call! = () -> begin
-        copyto!(sigmas, sigmas_base)
-        ESRIcascade._accumulate_downstream_components!(
-            em_new,
-            nv_new,
-            downstream,
-            sigmas,
-            essential_impact,
-            nonessential_impact,
-            info,
-        )
-    end
+    new_call! =
+        () -> begin
+            copyto!(sigmas, sigmas_base)
+            ESRIcascade._accumulate_downstream_components!(
+                em_new,
+                nv_new,
+                downstream,
+                sigmas,
+                essential_impact,
+                nonessential_impact,
+                info,
+            )
+        end
 
     old_call!()
     new_call!()
 
-    if !(isapprox(em_old, em_new; atol = 1e-12, rtol = 1e-12) &&
-         isapprox(nv_old, nv_new; atol = 1e-12, rtol = 1e-12))
+    if !(
+        isapprox(em_old, em_new; atol = 1e-12, rtol = 1e-12) &&
+        isapprox(nv_old, nv_new; atol = 1e-12, rtol = 1e-12)
+    )
         error("dense accumulation mismatch between old and new implementation")
     end
 

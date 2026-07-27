@@ -54,8 +54,10 @@ function _accumulate_downstream_components!(
             continue
         end
         @simd for customer = 1:ncustomers
-            essential_matrix[customer, industry] += factor * essential_impact[supplier, customer]
-            nonessential_vector[customer] += factor * nonessential_impact[supplier, customer]
+            essential_matrix[customer, industry] +=
+                factor * essential_impact[supplier, customer]
+            nonessential_vector[customer] +=
+                factor * nonessential_impact[supplier, customer]
         end
     end
     return nothing
@@ -92,7 +94,7 @@ function _accumulate_active_sparse_downstream_components!(
         factor == zeroT && continue
         industry = industry_map[supplier]
 
-        for idx = essential_rowptr[supplier]:(essential_rowptr[supplier + 1] - 1)
+        for idx = essential_rowptr[supplier]:(essential_rowptr[supplier+1]-1)
             linear_idx = essential_colval[idx] + (industry - 1) * ncustomers
             if essential_matrix[linear_idx] == zeroT
                 push!(essential_touched, linear_idx)
@@ -100,7 +102,7 @@ function _accumulate_active_sparse_downstream_components!(
             essential_matrix[linear_idx] += factor * essential_vals[idx]
         end
 
-        for idx = nonessential_rowptr[supplier]:(nonessential_rowptr[supplier + 1] - 1)
+        for idx = nonessential_rowptr[supplier]:(nonessential_rowptr[supplier+1]-1)
             nonessential_vector[nonessential_colval[idx]] += factor * nonessential_vals[idx]
         end
     end
@@ -118,16 +120,15 @@ function downstream_step!(
     fill!(downstream_vector, zero(eltype(downstream_vector)))
     @inbounds for col = 1:ncols
         @simd for firm_idx = 1:n
-            downstream_vector[firm_idx] = max(
-                downstream_vector[firm_idx],
-                essential_matrix[firm_idx, col],
-            )
+            downstream_vector[firm_idx] =
+                max(downstream_vector[firm_idx], essential_matrix[firm_idx, col])
         end
     end
     @inbounds for firm_idx = 1:n
         essential_health = one(eltype(downstream_vector)) - downstream_vector[firm_idx]
         nonessential_health = one(eltype(downstream_vector)) - nonessential_vector[firm_idx]
-        downstream_vector[firm_idx] = min(essential_health, nonessential_health, psi[firm_idx])
+        downstream_vector[firm_idx] =
+            min(essential_health, nonessential_health, psi[firm_idx])
     end
     return downstream_vector
 end
@@ -145,7 +146,8 @@ function downstream_step!(
     fill!(downstream_vector, zeroT)
     @inbounds for linear_idx in essential_touched
         customer = mod(linear_idx - 1, n) + 1
-        downstream_vector[customer] = max(downstream_vector[customer], essential_matrix[linear_idx])
+        downstream_vector[customer] =
+            max(downstream_vector[customer], essential_matrix[linear_idx])
         essential_matrix[linear_idx] = zeroT
     end
     empty!(essential_touched)
@@ -153,7 +155,8 @@ function downstream_step!(
     @inbounds for firm_idx in eachindex(downstream_vector)
         essential_health = oneT - downstream_vector[firm_idx]
         nonessential_health = oneT - nonessential_vector[firm_idx]
-        downstream_vector[firm_idx] = min(essential_health, nonessential_health, psi[firm_idx])
+        downstream_vector[firm_idx] =
+            min(essential_health, nonessential_health, psi[firm_idx])
     end
     return downstream_vector
 end
@@ -171,14 +174,7 @@ function downstream_shock!(
     temp_sums::AbstractVector;
     industry_map::AbstractVector{Int} = info.industry_of_firm,
 )
-    compute_sigmas!(
-        sigmas,
-        row_sums,
-        current_downstream,
-        info,
-        temp_sums,
-        industry_map,
-    )
+    compute_sigmas!(sigmas, row_sums, current_downstream, info, temp_sums, industry_map)
 
     _accumulate_downstream_components!(
         essential_matrix,

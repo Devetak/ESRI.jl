@@ -7,7 +7,8 @@
     BLAS.set_num_threads(1)
     try
         scores_sparse = esri(econ; maxiter = 30, tol = 1e-3, threads = false)
-        scores_dense = compute_esri(W_dense, info; maxiter = 30, tol = 1e-3, threads = false)
+        scores_dense =
+            compute_esri(W_dense, info; maxiter = 30, tol = 1e-3, threads = false)
         scores_threaded = esri(econ; maxiter = 30, tol = 1e-3, threads = true)
         manual_threaded = zeros(econ.n)
         tasks = map(1:econ.n) do firm_idx
@@ -67,12 +68,15 @@ end
     @test all(direct.upstream .<= psi .+ 1e-12)
     @test all(direct.downstream .<= psi .+ 1e-12)
 
-    W_sparse, info_sparse = sparse_fixture(seed = 91, n = 14, density = 0.1, nindustries = 3)
+    W_sparse, info_sparse =
+        sparse_fixture(seed = 91, n = 14, density = 0.1, nindustries = 3)
     econ_sparse = ESRIEconomy(W_sparse, info_sparse)
     psi_sparse = fill(1.0, 14)
     psi_sparse[[1, 4, 7]] .= (0.1, 0.6, 0.0)
-    direct_sparse = esri(econ_sparse, 4; shock = psi_sparse, details = true, maxiter = 25, tol = 1e-3)
-    wrapped_sparse = esri_shock(econ_sparse, psi_sparse; details = true, maxiter = 25, tol = 1e-3)
+    direct_sparse =
+        esri(econ_sparse, 4; shock = psi_sparse, details = true, maxiter = 25, tol = 1e-3)
+    wrapped_sparse =
+        esri_shock(econ_sparse, psi_sparse; details = true, maxiter = 25, tol = 1e-3)
     @test direct_sparse.esri ≈ wrapped_sparse.esri atol = 1e-12 rtol = 0
     @test direct_sparse.upstream ≈ wrapped_sparse.upstream atol = 1e-12 rtol = 0
     @test direct_sparse.downstream ≈ wrapped_sparse.downstream atol = 1e-12 rtol = 0
@@ -88,8 +92,10 @@ end
 
     @test details.upstream ≈ [0.0, 1.0] atol = 1e-12 rtol = 0
     @test details.downstream ≈ [0.0, 0.0] atol = 1e-10 rtol = 0
-    @test esri(econ, 1; combine = :upstream, maxiter = 100, tol = 1e-12) ≈ 2 / 3 atol = 1e-12 rtol = 0
-    @test esri(econ, 1; combine = :downstream, maxiter = 100, tol = 1e-12) ≈ 1.0 atol = 1e-10 rtol = 0
+    @test esri(econ, 1; combine = :upstream, maxiter = 100, tol = 1e-12) ≈ 2 / 3 atol =
+        1e-12 rtol = 0
+    @test esri(econ, 1; combine = :downstream, maxiter = 100, tol = 1e-12) ≈ 1.0 atol =
+        1e-10 rtol = 0
     @test details.esri ≈ 1.0 atol = 1e-10 rtol = 0
 
     econ0 = ESRIEconomy(zeros(4, 4), IndustryInfo([1, 2, 1, 2], [true, false]))
@@ -133,10 +139,27 @@ end
 
     ref = compute_esri(W, info; maxiter = 10, tol = 1e-2, threads = true)
     if Threads.nthreads() > 1
-        @test_logs (:warn, r"Ignoring `verbose=true` because progress UI is disabled in threaded mode\.") begin
-            @test compute_esri(W, info; maxiter = 10, tol = 1e-2, verbose = true, threads = true) == ref
+        @test_logs (
+            :warn,
+            r"Ignoring `verbose=true` because progress UI is disabled in threaded mode\.",
+        ) begin
+            @test compute_esri(
+                W,
+                info;
+                maxiter = 10,
+                tol = 1e-2,
+                verbose = true,
+                threads = true,
+            ) == ref
         end
     else
-        @test compute_esri(W, info; maxiter = 10, tol = 1e-2, verbose = true, threads = true) == ref
+        @test compute_esri(
+            W,
+            info;
+            maxiter = 10,
+            tol = 1e-2,
+            verbose = true,
+            threads = true,
+        ) == ref
     end
 end

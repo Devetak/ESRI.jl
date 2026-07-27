@@ -48,12 +48,14 @@ end
     @test got_coupled.upstream ≈ ref_coupled.upstream atol = 1e-12 rtol = 0
     @test got_coupled.downstream ≈ ref_coupled.downstream atol = 1e-12 rtol = 0
 
-    W_sparse, info_sparse, _ = powerlaw_fixture(seed = 8, n = 40, mean_degree = 6, max_degree = 32)
+    W_sparse, info_sparse, _ =
+        powerlaw_fixture(seed = 8, n = 40, mean_degree = 6, max_degree = 32)
     econ_sparse = ESRIEconomy(W_sparse, info_sparse)
     psi = fill(1.0, 40)
     psi[[2, 9, 17]] .= (0.0, 0.4, 0.8)
 
-    ref_sparse = reference_lockstep_scenario(econ_sparse, 9; maxiter = 60, tol = 1e-6, shock = psi)
+    ref_sparse =
+        reference_lockstep_scenario(econ_sparse, 9; maxiter = 60, tol = 1e-6, shock = psi)
     got_sparse = esri(econ_sparse, 9; details = true, maxiter = 60, tol = 1e-6, shock = psi)
     @test got_sparse.esri ≈ ref_sparse.esri atol = 1e-10 rtol = 0
     @test got_sparse.upstream ≈ ref_sparse.upstream atol = 1e-10 rtol = 0
@@ -61,12 +63,24 @@ end
 end
 
 @testset "Power-law sparse full-economy parity" begin
-    W_sparse, info, _ = powerlaw_fixture(seed = 17, n = 60, mean_degree = 7, max_degree = 48, nindustries = 8)
+    W_sparse, info, _ = powerlaw_fixture(
+        seed = 17,
+        n = 60,
+        mean_degree = 7,
+        max_degree = 48,
+        nindustries = 8,
+    )
     W_dense = Matrix(W_sparse)
     econ = ESRIEconomy(W_sparse, info)
 
     sparse_scores = esri(econ; maxiter = 35, tol = 1e-3, threads = false)
-    explicit_scores = esri(econ; maxiter = 35, tol = 1e-3, threads = false, firm_indices = collect(1:size(W_sparse, 1)))
+    explicit_scores = esri(
+        econ;
+        maxiter = 35,
+        tol = 1e-3,
+        threads = false,
+        firm_indices = collect(1:size(W_sparse, 1)),
+    )
     dense_scores = compute_esri(W_dense, info; maxiter = 35, tol = 1e-3, threads = false)
     threaded_scores = compute_esri(W_sparse, info; maxiter = 35, tol = 1e-3, threads = true)
     manual_threaded = zeros(size(W_sparse, 1))

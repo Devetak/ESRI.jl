@@ -53,7 +53,7 @@ function upstream_step!(
             continue
         end
         start_idx = colptr[firm_idx]
-        stop_idx = colptr[firm_idx + 1] - 1
+        stop_idx = colptr[firm_idx+1] - 1
         acc = _sparse_column_accumulate(rows, vals, previous_upstream, start_idx, stop_idx)
         current_upstream[firm_idx] = min(acc, psi[firm_idx])
     end

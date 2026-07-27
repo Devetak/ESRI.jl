@@ -64,8 +64,9 @@ end
 function _industry_indices(industry_of_firm::AbstractVector{<:Integer}, nindustries::Int)
     nindustries > 0 || throw(ArgumentError("essential_industry must be non-empty"))
     indices = Int.(industry_of_firm)
-    all(idx -> 1 <= idx <= nindustries, indices) ||
-        throw(ArgumentError("industry_of_firm values must be in 1:length(essential_industry)"))
+    all(idx -> 1 <= idx <= nindustries, indices) || throw(
+        ArgumentError("industry_of_firm values must be in 1:length(essential_industry)"),
+    )
     return indices
 end
 
@@ -76,7 +77,11 @@ function IndustryInfo(
     nindustries = length(essential_industry)
     firm_industry = _industry_indices(industry_of_firm, nindustries)
     essential_industry = Vector{Bool}(essential_industry)
-    return IndustryInfo(firm_industry, essential_industry, essential_industry[firm_industry])
+    return IndustryInfo(
+        firm_industry,
+        essential_industry,
+        essential_industry[firm_industry],
+    )
 end
 
 # Keep the pre-classification three-field constructor usable.  Its matrix view
@@ -106,7 +111,11 @@ function IndustryInfo(
     industry_of_firm::AbstractVector{<:Integer},
     input_classification::AbstractMatrix{Bool},
 )
-    throw(ArgumentError("Boolean input_classification is ambiguous; use integer codes 0, 1, and 2"))
+    throw(
+        ArgumentError(
+            "Boolean input_classification is ambiguous; use integer codes 0, 1, and 2",
+        ),
+    )
 end
 
 function IndustryInfo(

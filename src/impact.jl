@@ -135,7 +135,7 @@ function compute_downstream_impact_matrices(
 
     @inbounds for col = 1:ncols
         start_idx = colptr[col]
-        stop_idx = colptr[col + 1] - 1
+        stop_idx = colptr[col+1] - 1
         if start_idx > stop_idx
             continue
         end
@@ -162,13 +162,15 @@ function compute_downstream_impact_matrices(
                 denom = essential_by_industry[supplier_industry]
                 essential_vals[idx] = denom == 0 ? zeroT : val / denom
             elseif classification == 1
-                nonessential_vals[idx] = all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
+                nonessential_vals[idx] =
+                    all_suppliers_total == 0 ? zero(TF) : val / all_suppliers_total
             end
         end
     end
 
     essential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), essential_vals)
-    nonessential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), nonessential_vals)
+    nonessential_csc =
+        SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), nonessential_vals)
     dropzeros!(essential_csc)
     dropzeros!(nonessential_csc)
     return sparsecsr(essential_csc), sparsecsr(nonessential_csc)
@@ -194,7 +196,9 @@ function _validate_weight_matrix_entries(weight_matrix::SparseMatrixCSC{T}) wher
     return nothing
 end
 
-function _promote_weight_matrix(weight_matrix::SparseMatrixCSC{T,Ti}) where {T<:Real,Ti<:Integer}
+function _promote_weight_matrix(
+    weight_matrix::SparseMatrixCSC{T,Ti},
+) where {T<:Real,Ti<:Integer}
     TF = float(T)
     if T === TF
         return weight_matrix
@@ -230,7 +234,8 @@ function ESRIEconomy(weight_matrix::AbstractMatrix{T}, info::IndustryInfo) where
     _validate_weight_matrix_entries(matrix)
 
     upstream_impact = create_upstream_impact_matrix(matrix)
-    downstream_impact_essential, downstream_impact_nonessential = compute_downstream_impact_matrices(matrix, info)
+    downstream_impact_essential, downstream_impact_nonessential =
+        compute_downstream_impact_matrices(matrix, info)
 
     column_sums = vec(sum(matrix, dims = 1))
     row_sums = vec(sum(matrix, dims = 2))

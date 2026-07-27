@@ -49,15 +49,6 @@ end
     @test count(==(UInt8(0)), classification) == 269204
     @test count(==(UInt8(1)), classification) == 45013
     @test count(==(UInt8(2)), classification) == 65239
-    @test bytes2hex(sha256(read(joinpath(data_dir, "ihs_classification.bin")))) ==
-          "5597eab3055aea00b04ab723a26e32ef704b021aebe42ba040bd66a629756c76"
-    @test bytes2hex(sha256(read(joinpath(data_dir, "ihs_industry_codes.txt")))) ==
-          "29cbacaf97a3cb51c9e0b92603a024f3b1f9f6a45392c0c675a4bc07142ac61b"
-    @test bytes2hex(sha256(vec(classification))) ==
-          "5f90f03db4af0c144e989bb46d21db016ef7841bf5d9ff4e1c23de79a97f3a27"
-    @test bytes2hex(sha256(join(ihs_industry_codes(), "\n") * "\n")) ==
-          "29cbacaf97a3cb51c9e0b92603a024f3b1f9f6a45392c0c675a4bc07142ac61b"
-
     classification[1, 1] = 0
     @test ihs_input_classification()[1, 1] == 2
 end

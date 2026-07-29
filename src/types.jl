@@ -7,7 +7,8 @@ Firm industry ids and input classifications. `input_classification[supplier, cus
 is `0` (no downstream impact), `1` (nonessential), or `2` (essential). The
 legacy `essential_industry` and `essential_firm` fields remain for compatibility;
 with matrix-based customer-specific classifications they are true only for rows
-consisting entirely of `2`s.
+consisting entirely of `2`s. The one-argument form classifies every pair as `1`,
+giving a purely linear baseline.
 """
 struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
     industry_of_firm::TI
@@ -58,7 +59,7 @@ end
 
 function IndustryInfo(industry_of_firm::AbstractVector{<:Integer})
     isempty(industry_of_firm) && throw(ArgumentError("industry_of_firm must be non-empty"))
-    return IndustryInfo(industry_of_firm, trues(maximum(industry_of_firm)))
+    return IndustryInfo(industry_of_firm, falses(maximum(industry_of_firm)))
 end
 
 function _industry_indices(industry_of_firm::AbstractVector{<:Integer}, nindustries::Int)

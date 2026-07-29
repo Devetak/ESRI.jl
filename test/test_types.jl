@@ -19,8 +19,9 @@
     ).input_classification == legacy_info.input_classification
 
     default_info = IndustryInfo(industry_ids)
-    @test default_info.input_classification == fill(UInt8(2), 2, 2)
-    @test default_info.essential_firm == trues(length(industry_ids))
+    @test default_info.input_classification == fill(UInt8(1), 2, 2)
+    @test default_info.essential_industry == falses(2)
+    @test default_info.essential_firm == falses(length(industry_ids))
     @test_throws ArgumentError IndustryInfo(Int[])
 
     @test IndustryInfo(Int32[1, 2, 1, 2], Bool[true, false]).industry_of_firm ==
@@ -43,7 +44,6 @@ end
 
 @testset "Bundled IHS classification" begin
     classification = ihs_input_classification()
-    data_dir = joinpath(@__DIR__, "..", "data")
     @test size(classification) == (616, 616)
     @test ihs_industry_codes()[[1, end]] == ["0111", "9999"]
     @test count(==(UInt8(0)), classification) == 269204

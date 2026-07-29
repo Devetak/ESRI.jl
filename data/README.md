@@ -33,5 +33,4 @@ the required attribution and modification notice. The package code remains
 MIT-licensed.
 
 The package exposes these assets through `ihs_input_classification()` and
-`ihs_industry_codes()`. The existing `IndustryInfo(industry_of_firm)` default
-remains all-essential for backward compatibility.
+`ihs_industry_codes()`.

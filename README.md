@@ -46,7 +46,9 @@ scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
 
 ## Essential and non-essential inputs
 
-Choose one input classification, then use the same `econ` and `esri` call:
+The one-argument `IndustryInfo(industry_of_firm)` uses a purely linear production
+function. To add essential inputs, choose a classification, then use the same
+`econ` and `esri` call:
 
 ```julia
 # 1. Old essential/non-essential behavior, using the new matrix API.

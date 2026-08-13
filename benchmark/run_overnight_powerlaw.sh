@@ -20,7 +20,7 @@ workers=1 4
 comparison=Julia versus FastCascade/R, one score per firm, tolerance 1e-2
 EOF
 
-for classification in ihs legacy linear; do
+for classification in legacy linear ihs; do
   cases="10000:1 10000:4"
   [ "$classification" != ihs ] || cases="$cases 100000:1 100000:4"
   echo "Starting $classification cases: $cases"

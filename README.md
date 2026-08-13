@@ -98,13 +98,14 @@ Build `ESRIEconomy` once and reuse it on the same network.
 - `final_weights` replaces the weights in the final ESRI reduction. With custom weights, the scalar is the weighted loss divided by `sum(final_weights)`.
 - `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. 
 
-## Sparse C++ reference benchmark
+## Full ESRI C++ reference benchmark
 
 `benchmark/` contains a one-to-one prepared sparse comparison against
-`fastcascade::GL_cascade_dynamics_cpp`: the same IHS classification matrix,
-1,232 firms, 9,856 sparse links, 16 closures, tolerance, and one-thread setting.
-Both runners check the same C++ reference scores before printing medians. See
-[benchmark/README.md](benchmark/README.md) for the two commands and prerequisites.
+`fastcascade::GL_cascade_dynamics_cpp`. It closes every firm at four network
+sizes under IHS, legacy essential/non-essential, and all-linear input
+classifications. The Julia runner checks every score and the total ESRI against
+the C++ result.
+See [benchmark/README.md](benchmark/README.md) for the commands and prerequisites.
 
 ## Reference
 

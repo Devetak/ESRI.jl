@@ -1,48 +1,41 @@
-# Sparse Julia/C++ comparison
+# Full ESRI Julia/C++ benchmark
 
-These paired scripts time an equivalent prepared sparse workload: 1,232 firms,
-the 616 by 616 IHS `0/1/2` classification matrix, 9,856 directed links, and
-16 single-firm closures spread evenly across industries. The rows of `W` are
-suppliers and its columns are customers. Both scripts keep network/classification parsing and sparse
-operator construction outside the timed region. The C++ setup drops explicit
-zero downstream entries before timing, matching Julia's stored sparse operators.
-The C++ routine accepts the 16 closures in one native call; Julia's public serial
-API completes the same 16 closures with a reused workspace.
+The benchmark closes every firm in the same deterministic directed power-law network at
+10,000, 20,000, 50,000, and 100,000 firms. It compares three 616-industry
+classifications: the IHS `0/1/2` matrix, the legacy essential/non-essential
+rule with alternating essential supplier industries, and an all-linear matrix.
 
-Set `ESRI_IHS_MATRIX` to the labeled `EssMatIHS.csv` file, then run each script
-with one computational thread:
+Out-degrees follow a truncated power law with exponent 2.3, mean 8, and cap
+128. The generator uses seed 42, excludes self-links, and writes one shared
+edge list that both Julia and FastCascade/R load.
+
+Both solvers use the tutorial convergence tolerance of `1e-2`. Because their
+stopping criteria differ, the comparison reports maximum and mean absolute
+score differences, the firm and two scores at the maximum difference, and a
+`within_tolerance` flag instead of requiring equality. Firm IDs must match
+one-to-one before the comparison runs.
+
+Both implementations use eight workers. Network construction, operator setup,
+worker startup, and validation are outside the prepared-solve timing. The R
+runner checkpoints completed waves; the Julia runner then compares every score
+and the total ESRI before writing the comparison diagnostics.
+
+The R script requires `GLcascade` and `fastcascade` 0.9.3.1.
 
 ```bash
 ESRI_IHS_MATRIX=/path/to/EssMatIHS.csv \
-JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-julia --project=. benchmark/ihs_sparse_julia.jl
-
-ESRI_IHS_MATRIX=/path/to/EssMatIHS.csv \
-OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
-Rscript benchmark/ihs_sparse_fastcascade.R
+  benchmark/run_full_esri_comparison.sh
 ```
 
-The R script requires `GLcascade` and `fastcascade` 0.9.3.1 and calls
-`fastcascade::GL_cascade_dynamics_cpp` directly. The Julia script calls only
-the public `IndustryInfo`, `ESRIEconomy`, and `esri` API. Both check the same
-16 C++ reference scores to `1e-12`; compare their printed medians only after
-both parity checks pass.
+Results are written under `results/full_esri_matrix_comparison/`.
 
-For the paper-scale firm counts `10_000`, `20_000`, `50_000`, and `100_000`,
-set `ESRI_BENCHMARK_FIRMS`. Firms are assigned evenly across the same 616
-industries, with any remainder assigned once to the first industries. The C++
-script writes the 16 reference scores and Julia reads them before timing:
+For the overnight power-law matrix (10,000 firms under all three production
+specifications and 100,000 firms under IHS, each with 1 and 4 workers), run:
 
 ```bash
-for firms in 10000 20000 50000 100000; do
-  reference=/tmp/esri-cpp-${firms}.csv
-  ESRI_BENCHMARK_FIRMS=$firms ESRI_REFERENCE_SCORES=$reference \
-    ESRI_IHS_MATRIX=/path/to/EssMatIHS.csv OMP_NUM_THREADS=1 \
-    OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 \
-    Rscript benchmark/ihs_sparse_fastcascade.R
-  ESRI_BENCHMARK_FIRMS=$firms ESRI_REFERENCE_SCORES=$reference \
-    ESRI_IHS_MATRIX=/path/to/EssMatIHS.csv JULIA_NUM_THREADS=1 \
-    OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-    julia --project=. benchmark/ihs_sparse_julia.jl
-done
+ESRI_IHS_MATRIX=/path/to/EssMatIHS.csv \
+  caffeinate -i benchmark/run_overnight_powerlaw.sh
 ```
+
+The combined result is written under `results/overnight_powerlaw/`. Both
+implementations reuse the same generated network file at each firm count.

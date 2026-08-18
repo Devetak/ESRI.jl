@@ -95,8 +95,10 @@ Build `ESRIEconomy` once and reuse it on the same network.
 - `esri(econ; ...)` computes the default single-firm closure for each selected firm. If `firm_indices` is set, unrequested entries stay zero.
 - `esri(econ, firm_idx; ...)` solves one scenario and returns a scalar, a named tuple, or `ESRIResult`.
 - `esri_shock(econ, psi; ...)` solves one scenario from an explicit capacity cap vector `psi ∈ [0,1]^N`.
+- `details=true` or `components=:upstream|:downstream|:both` returns the converged component states for a single scenario.
 - `final_weights` replaces the weights in the final ESRI reduction. With custom weights, the scalar is the weighted loss divided by `sum(final_weights)`.
-- `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. 
+- `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure.
+- `compute_esri(...)` and `compute_esri_shock(...)` are matrix-first wrappers that build `ESRIEconomy` and dispatch to the matching call.
 
 ## Full ESRI C++ reference benchmark
 
@@ -106,6 +108,32 @@ sizes under IHS, legacy essential/non-essential, and all-linear input
 classifications. The Julia runner checks every score and the total ESRI against
 the C++ result.
 See [benchmark/README.md](benchmark/README.md) for the commands and prerequisites.
+
+### Submitted runtime snapshot
+
+The table below is the supplied benchmark snapshot, recorded here without
+rerunning the benchmark. Each size uses the same deterministic directed
+truncated power-law network specification (mean out-degree 8, exponent 2.3,
+degree cap 128, seed 42, no self-links), and reports prepared solve time per
+firm. Speedup is
+`fastcascade` divided by `ESRIcascade.jl`.
+The supplied run uses the benchmark runner's default one-thread BLAS/OpenMP
+restriction.
+
+| Size | Production function | Workers | ESRIcascade.jl (ms per firm) | fastcascade (ms per firm) | Speedup |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 10k | IHS | 1 | 0.777 | 172.422 | 221.91× |
+| 10k | IHS | 4 | 0.296 | 61.432 | 207.43× |
+| 10k | Legacy | 1 | 1.103 | 210.009 | 190.36× |
+| 10k | Legacy | 4 | 0.343 | 72.083 | 210.35× |
+| 10k | Linear | 1 | 0.826 | 250.429 | 303.30× |
+| 10k | Linear | 4 | 0.293 | 86.772 | 295.69× |
+| 100k | IHS | 1 | 9.885 | 1900.390 | 192.25× |
+| 100k | IHS | 4 | 4.222 | 587.493 | 139.16× |
+
+The Julia and `fastcascade` scores matched within the benchmark convergence
+tolerance. The detailed benchmark scope and rerun commands are in
+[`benchmark/README.md`](benchmark/README.md).
 
 ## Reference
 

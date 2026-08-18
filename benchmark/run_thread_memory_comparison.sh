@@ -22,6 +22,8 @@ Optional environment variables:
   ESRI_NETWORK_DIR          Directory for shared generated networks
                             (default: output directory)
   ESRI_RSS_SAMPLE_SECONDS   RSS sampling interval (default: 0.1)
+  ESRI_UNRESTRICT_BLAS      1 to leave BLAS/OpenMP thread counts unrestricted
+                            (default: restricted to one)
 EOF
 }
 
@@ -120,6 +122,16 @@ measure_peak_rss() {
   return "$status"
 }
 
+thread_env() {
+  if [ "${ESRI_UNRESTRICT_BLAS:-0}" = 1 ]; then
+    env -u OMP_NUM_THREADS -u OPENBLAS_NUM_THREADS -u MKL_NUM_THREADS \
+      -u VECLIB_MAXIMUM_THREADS "$@"
+  else
+    env OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+      VECLIB_MAXIMUM_THREADS=1 "$@"
+  fi
+}
+
 sample_seconds=${ESRI_RSS_SAMPLE_SECONDS:-0.1}
 awk -v value="$sample_seconds" 'BEGIN {
   if (value !~ /^[0-9]*[.]?[0-9]+$/ || value + 0 <= 0) exit 1
@@ -170,6 +182,7 @@ timing=prepared solve reported by the existing Julia and FastCascade runners
 memory=sampled peak aggregate RSS of the isolated workload process group
 memory_scope=full invocation, including setup, warmup, solve, and validation
 memory_caveat=includes re-parented R workers; aggregate RSS can count shared pages once per process
+blas_openmp_restricted=$([ "${ESRI_UNRESTRICT_BLAS:-0}" = 1 ] && echo no || echo yes)
 network=directed truncated power-law out-degree, mean 8, alpha 2.3, cap 128, seed 42, no self-links
 network_dir=$network_dir
 convergence_tolerance=${ESRI_CONVERGENCE_TOL:-1e-2}
@@ -199,28 +212,24 @@ for benchmark_case in $benchmark_cases; do
   worker_dir="$output_dir/workers_$workers/firms_$firms"
   mkdir -p "$worker_dir"
   echo "Running $firms firms with $workers workers: FastCascade/R"
-  measure_peak_rss "$worker_dir/fastcascade_r_peak_group_rss_kib.txt" env \
+  measure_peak_rss "$worker_dir/fastcascade_r_peak_group_rss_kib.txt" thread_env env \
     ESRI_BENCHMARK_FIRMS="$firms" \
     ESRI_BENCHMARK_WORKERS="$workers" \
     ESRI_CLASSIFICATION="$classification" \
     ESRI_NETWORK_FILE="$network_file" \
     ESRI_OUTPUT_DIR="$worker_dir" \
-    OMP_NUM_THREADS=1 \
-    OPENBLAS_NUM_THREADS=1 \
-    MKL_NUM_THREADS=1 \
-    VECLIB_MAXIMUM_THREADS=1 \
+    ESRI_UNRESTRICT_BLAS="${ESRI_UNRESTRICT_BLAS:-0}" \
     Rscript benchmark/full_esri_fastcascade.R
 
   echo "Running $firms firms with $workers workers: Julia"
-  measure_peak_rss "$worker_dir/julia_peak_group_rss_kib.txt" env \
+  measure_peak_rss "$worker_dir/julia_peak_group_rss_kib.txt" thread_env env \
     ESRI_BENCHMARK_FIRMS="$firms" \
     ESRI_BENCHMARK_WORKERS="$workers" \
     ESRI_CLASSIFICATION="$classification" \
     ESRI_NETWORK_FILE="$network_file" \
     ESRI_OUTPUT_DIR="$worker_dir" \
     JULIA_NUM_THREADS="$workers" \
-    OPENBLAS_NUM_THREADS=1 \
-    OMP_NUM_THREADS=1 \
+    ESRI_UNRESTRICT_BLAS="${ESRI_UNRESTRICT_BLAS:-0}" \
     julia --project=. benchmark/full_esri_julia.jl
 
   comparison="$worker_dir/${classification}_${firms}/comparison.csv"

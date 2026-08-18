@@ -34,3 +34,13 @@ MIT-licensed.
 
 The package exposes these assets through `ihs_input_classification()` and
 `ihs_industry_codes()`.
+
+The bundled IHS classification is opt-in: `IndustryInfo(industry_of_firm)`
+uses the purely linear baseline, while passing `ihs_input_classification()`
+enables the bundled essential/non-essential classification.
+
+The separate [ICIO regression fixture](ICIO/README.md) is used only by
+`test/test_ESRI_ICIO.jl`; it is not loaded by the package at runtime.
+
+For the submitted runtime comparison using this bundled data, see the
+[performance benchmark snapshot](../docs/src/performance.md).

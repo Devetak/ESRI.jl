@@ -16,6 +16,10 @@ scores = esri(econ; maxiter = 30, tol = 1e-3, threads = false)
 nothing
 ```
 
+`IndustryInfo(industry_of_firm)` uses a purely linear production function by
+default. Pass an essentiality vector or an integer classification matrix when
+the production function should include essential inputs.
+
 ![Histogram of economy-wide ESRI scores](assets/scores_hist.svg)
 
 ## Single firm with full details
@@ -107,3 +111,6 @@ true
 ```@doctest
 value = compute_esri(W, info, 7; maxiter = 20, tol = 1e-3)
 ```
+
+For the submitted runtime comparison and benchmark conditions, see
+[Performance](performance.md).

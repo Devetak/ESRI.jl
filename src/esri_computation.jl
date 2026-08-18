@@ -471,7 +471,8 @@ function esri(
 end
 
 """
-    compute_esri(weight_matrix, info::IndustryInfo; maxiter=100, tol=1e-2, verbose=false, threads=false, firm_indices=nothing)
+    compute_esri(weight_matrix, info::IndustryInfo; maxiter=100, tol=1e-2, verbose=false,
+                 threads=false, firm_indices=nothing, final_weights=nothing, combine=:min)
 
 Build `ESRIEconomy(weight_matrix, info)` and dispatch to `esri(econ; ...)`.
 """
@@ -500,7 +501,9 @@ function compute_esri(
 end
 
 """
-    esri_shock(econ::ESRIEconomy, shock::AbstractVector; ...)
+    esri_shock(econ::ESRIEconomy, shock::AbstractVector; maxiter=100, tol=1e-2,
+               verbose=false, details=false, components=:none,
+               final_weights=nothing, combine=:min)
 
 Solve one scenario from a capacity-cap vector `shock ∈ [0, 1]^N`.
 Return a scalar, a named tuple, or `ESRIResult`.
@@ -536,7 +539,9 @@ function esri_shock(
 end
 
 """
-    compute_esri_shock(weight_matrix, info::IndustryInfo, shock::AbstractVector; ...)
+    compute_esri_shock(weight_matrix, info::IndustryInfo, shock::AbstractVector;
+                       maxiter=100, tol=1e-2, verbose=false, details=false,
+                       components=:none, final_weights=nothing, combine=:min)
 
 Build `ESRIEconomy(weight_matrix, info)` and dispatch to `esri_shock`.
 """
@@ -567,7 +572,9 @@ function compute_esri_shock(
 end
 
 """
-    compute_esri(weight_matrix, info::IndustryInfo, firm_idx::Integer; ...)
+    compute_esri(weight_matrix, info::IndustryInfo, firm_idx::Integer;
+                 maxiter=100, tol=1e-2, verbose=false, details=false,
+                 components=:none, final_weights=nothing, combine=:min, shock=nothing)
 
 Build `ESRIEconomy(weight_matrix, info)` and dispatch to `esri(econ, firm_idx; ...)`.
 """

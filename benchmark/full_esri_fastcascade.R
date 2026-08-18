@@ -5,12 +5,14 @@ library(parallel)
 
 main <- function() {
   options(digits = 17)
-  Sys.setenv(
-    OMP_NUM_THREADS = "1",
-    OPENBLAS_NUM_THREADS = "1",
-    MKL_NUM_THREADS = "1",
-    VECLIB_MAXIMUM_THREADS = "1"
-  )
+  if (Sys.getenv("ESRI_UNRESTRICT_BLAS", "0") != "1") {
+    Sys.setenv(
+      OMP_NUM_THREADS = "1",
+      OPENBLAS_NUM_THREADS = "1",
+      MKL_NUM_THREADS = "1",
+      VECLIB_MAXIMUM_THREADS = "1"
+    )
+  }
 
   matrix_path <- Sys.getenv("ESRI_IHS_MATRIX")
   if (!file.exists(matrix_path)) {

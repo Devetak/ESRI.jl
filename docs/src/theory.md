@@ -8,6 +8,10 @@ C_{k\ell} \in \{0,1,2\}.
 
 Here `2` marks industry `k` as essential to industry `\ell`, `1` marks it as non-essential, and `0` gives the link no short-term downstream production effect. The legacy Boolean vector is shorthand for setting each row of `C` entirely to `2` or entirely to `1`.
 
+The one-argument `IndustryInfo(industry_of_firm)` constructor uses `C = 1`
+for every supplier-customer pair, giving the purely linear baseline. The
+bundled IHS matrix is opt-in through `ihs_input_classification()`.
+
 The package also uses a capacity-cap vector `\psi \in [0,1]^N`.
 
 The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, firm `i` can operate at at most a `\psi_i` fraction of its normal capacity. This is the main way to describe a shock scenario in the package. You can use it for one closed firm, a partly constrained sector, or a wider event such as an energy shortage, sanctions, or a port disruption. ESRI then shows how that initial shock can move through supply chains and affect the wider economy.
@@ -185,6 +189,8 @@ With the default `w_i = r_i`, this is a share of total output. With custom `fina
 ## Relation to the paper
 
 The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022). We allow for general shock scenarios via `\psi`.
+
+For the submitted runtime comparison, see [Performance](performance.md).
 
 ## References
 

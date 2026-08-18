@@ -4,7 +4,7 @@ using LinearAlgebra
 using Printf
 using SparseArrays
 
-BLAS.set_num_threads(1)
+get(ENV, "ESRI_UNRESTRICT_BLAS", "0") == "1" || BLAS.set_num_threads(1)
 
 classification_name = get(ENV, "ESRI_CLASSIFICATION", "ihs")
 classification_name in ("ihs", "legacy", "linear") ||

@@ -24,8 +24,15 @@ scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
 nothing
 ```
 
+The one-argument `IndustryInfo(industry_of_firm)` is the purely linear
+baseline. Use the Boolean or matrix form when the production function should
+include essential inputs.
+
 ![Histogram of example ESRI scores](assets/scores_hist.svg)
 
 The histogram is usually the first thing to look at. If most firms sit near zero, most single-firm failures have limited economy-wide spillovers. A longer right tail means some firms create much larger losses when they fail.
 
 Build `ESRIEconomy` once and reuse it on the same network.
+
+See [Performance](performance.md) for the submitted Julia/`fastcascade` runtime
+comparison and the benchmark scope.

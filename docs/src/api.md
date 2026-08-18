@@ -20,15 +20,19 @@
 
 `esri(econ, firm_idx; maxiter=100, tol=1e-2, verbose=false, details=false, components=:none, final_weights=nothing, combine=:min, shock=nothing)` solves one scenario. By default it closes `firm_idx`. If `shock=psi` is given, then `psi ∈ [0,1]^N` is the whole scenario: `psi[i] = 1` means no exogenous shock to firm `i`, `psi[i] = 0` means firm `i` is closed, and intermediate values cap firm `i` at partial capacity.
 
-`esri_shock(econ, shock; ...)` solves one scenario from an explicit capacity-cap vector `shock ∈ [0,1]^N`.
+`esri_shock(econ, shock; maxiter=100, tol=1e-2, verbose=false, details=false, components=:none, final_weights=nothing, combine=:min)` solves one scenario from an explicit capacity-cap vector `shock ∈ [0,1]^N`.
 
-`compute_esri(...)` and `compute_esri_shock(...)` rebuild `ESRIEconomy` and dispatch to the matching `esri` method.
+`compute_esri(W, info; ...)` rebuilds `ESRIEconomy` and dispatches to economy-wide `esri(econ; ...)`. `compute_esri(W, info, firm_idx; ...)` dispatches to the single-scenario overload, including `details`, `components`, `final_weights`, `combine`, and `shock`.
+
+`compute_esri_shock(W, info, shock; maxiter=100, tol=1e-2, verbose=false, details=false, components=:none, final_weights=nothing, combine=:min)` rebuilds `ESRIEconomy` and dispatches to `esri_shock`.
 
 ## Keywords
 
 `maxiter` is the maximum number of upstream/downstream iterations for one scenario. `tol` is the infinity-norm stopping threshold.
 
 `threads=true` applies only to economy-wide `esri(econ; ...)` and `compute_esri(W, info; ...)`. It parallelizes across shocked firms, not within one fixed-point solve.
+
+See [Performance](performance.md) for the submitted runtime comparison.
 
 `details=true` is shorthand for `components=:both`.
 

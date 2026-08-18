@@ -83,6 +83,7 @@ data/*
 !data/ihs_classification.bin
 !data/ihs_industry_codes.txt
 !data/verify_zenodo_ihs.jl
+!data/ICIO/
 results/
 output.txt
 esris.txt

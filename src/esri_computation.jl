@@ -127,11 +127,10 @@ function _row_counts(rows::AbstractVector{Int}, n::Int)
     return counts
 end
 
-function _supports_degree_permutation(econ::ESRIEconomy)
-    return econ.upstream_impact isa SparseMatrixCSC &&
-           econ.downstream_impact_essential isa SparseMatrixCSR &&
-           econ.downstream_impact_nonessential isa SparseMatrixCSR
-end
+_supports_degree_permutation(econ::ESRIEconomy) =
+    econ.upstream_impact isa SparseMatrixCSC &&
+    econ.downstream_impact_essential isa SparseMatrixCSR &&
+    econ.downstream_impact_nonessential isa SparseMatrixCSR
 
 function _degree_desc_permutation(econ::ESRIEconomy)
     out_degree =
@@ -142,9 +141,8 @@ function _degree_desc_permutation(econ::ESRIEconomy)
     return sortperm(1:econ.n; by = i -> (-score[i], i))
 end
 
-function _permute_sparse_csr(matrix::SparseMatrixCSR, perm::AbstractVector{Int})
-    return sparsecsr(SparseMatrixCSC(matrix)[perm, perm])
-end
+_permute_sparse_csr(matrix::SparseMatrixCSR, perm::AbstractVector{Int}) =
+    sparsecsr(SparseMatrixCSC(matrix)[perm, perm])
 
 function _permute_sparse_economy(econ::ESRIEconomy, perm::AbstractVector{Int})
     return ESRIEconomy(
@@ -191,21 +189,18 @@ function _default_shock!(psi::AbstractVector{T}, firm_idx::Integer) where {T}
     return psi
 end
 
-function _prepare_shock!(
+_prepare_shock!(
     psi::AbstractVector{T},
     firm_idx::Integer,
     shock::Union{Nothing,AbstractVector{<:Real}},
-) where {T}
-    return shock === nothing ? _default_shock!(psi, firm_idx) : _fill_shock!(psi, shock)
-end
+) where {T} = shock === nothing ? _default_shock!(psi, firm_idx) : _fill_shock!(psi, shock)
 
-function _normalize_esri(value::T, econ::ESRIEconomy{T}) where {T}
-    return econ.total_output > zero(T) ? value / econ.total_output : value
-end
+_normalize_esri(value::T, econ::ESRIEconomy{T}) where {T} =
+    econ.total_output > zero(T) ? value / econ.total_output : value
 
-function _normalize_esri(value::T, final_weights::AbstractVector{T}) where {T}
+_normalize_esri(value::T, final_weights::AbstractVector{T}) where {T} = begin
     denominator = sum(final_weights)
-    return denominator > zero(T) ? value / denominator : value
+    denominator > zero(T) ? value / denominator : value
 end
 
 function _package_result(
@@ -224,9 +219,9 @@ function _package_result(
     return ESRIResult(esri_value, copy(current_upstream), copy(current_downstream))
 end
 
-function _resolve_components(details::Bool, components::Symbol)
+_resolve_components(details::Bool, components::Symbol) = begin
     _validate_components(components)
-    return details ? :both : components
+    details ? :both : components
 end
 
 function _compute_single_esri!(
@@ -476,7 +471,7 @@ end
 
 Build `ESRIEconomy(weight_matrix, info)` and dispatch to `esri(econ; ...)`.
 """
-function compute_esri(
+compute_esri(
     weight_matrix,
     info::IndustryInfo;
     maxiter::Int = 100,
@@ -486,19 +481,16 @@ function compute_esri(
     firm_indices::Union{Nothing,AbstractVector{<:Integer}} = nothing,
     final_weights::Union{Nothing,AbstractVector{<:Real}} = nothing,
     combine::Symbol = :min,
+) = esri(
+    ESRIEconomy(weight_matrix, info);
+    maxiter,
+    tol,
+    verbose,
+    threads,
+    firm_indices,
+    final_weights,
+    combine,
 )
-    econ = ESRIEconomy(weight_matrix, info)
-    return esri(
-        econ;
-        maxiter = maxiter,
-        tol = tol,
-        verbose = verbose,
-        threads = threads,
-        firm_indices = firm_indices,
-        final_weights = final_weights,
-        combine = combine,
-    )
-end
 
 """
     esri_shock(econ::ESRIEconomy, shock::AbstractVector; maxiter=100, tol=1e-2,
@@ -545,7 +537,7 @@ end
 
 Build `ESRIEconomy(weight_matrix, info)` and dispatch to `esri_shock`.
 """
-function compute_esri_shock(
+compute_esri_shock(
     weight_matrix,
     info::IndustryInfo,
     shock::AbstractVector{<:Real};
@@ -556,20 +548,17 @@ function compute_esri_shock(
     components::Symbol = :none,
     final_weights::Union{Nothing,AbstractVector{<:Real}} = nothing,
     combine::Symbol = :min,
+) = esri_shock(
+    ESRIEconomy(weight_matrix, info),
+    shock;
+    maxiter,
+    tol,
+    verbose,
+    details,
+    components,
+    final_weights,
+    combine,
 )
-    econ = ESRIEconomy(weight_matrix, info)
-    return esri_shock(
-        econ,
-        shock;
-        maxiter = maxiter,
-        tol = tol,
-        verbose = verbose,
-        details = details,
-        components = components,
-        final_weights = final_weights,
-        combine = combine,
-    )
-end
 
 """
     compute_esri(weight_matrix, info::IndustryInfo, firm_idx::Integer;
@@ -578,7 +567,7 @@ end
 
 Build `ESRIEconomy(weight_matrix, info)` and dispatch to `esri(econ, firm_idx; ...)`.
 """
-function compute_esri(
+compute_esri(
     weight_matrix,
     info::IndustryInfo,
     firm_idx::Integer;
@@ -590,18 +579,15 @@ function compute_esri(
     final_weights::Union{Nothing,AbstractVector{<:Real}} = nothing,
     combine::Symbol = :min,
     shock::Union{Nothing,AbstractVector{<:Real}} = nothing,
+) = esri(
+    ESRIEconomy(weight_matrix, info),
+    firm_idx;
+    maxiter,
+    tol,
+    verbose,
+    details,
+    components,
+    final_weights,
+    combine,
+    shock,
 )
-    econ = ESRIEconomy(weight_matrix, info)
-    return esri(
-        econ,
-        firm_idx;
-        maxiter = maxiter,
-        tol = tol,
-        verbose = verbose,
-        details = details,
-        components = components,
-        final_weights = final_weights,
-        combine = combine,
-        shock = shock,
-    )
-end

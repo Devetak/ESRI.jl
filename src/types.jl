@@ -87,19 +87,16 @@ end
 
 # Keep the pre-classification three-field constructor usable.  Its matrix view
 # has the same row-constant 2/1 semantics as the old Boolean API.
-function IndustryInfo{TI,TB}(
+IndustryInfo{TI,TB}(
     industry_of_firm::TI,
     essential_industry::TB,
     essential_firm::TB,
-) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
-    nindustries = length(essential_industry)
-    return IndustryInfo{TI,TB}(
+) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}} = IndustryInfo{TI,TB}(
         industry_of_firm,
         essential_industry,
         essential_firm,
-        repeat(UInt8.(essential_industry) .+ UInt8(1), 1, nindustries),
+        repeat(UInt8.(essential_industry) .+ UInt8(1), 1, length(essential_industry)),
     )
-end
 
 IndustryInfo(
     industry_of_firm::TI,
@@ -108,16 +105,14 @@ IndustryInfo(
 ) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}} =
     IndustryInfo{TI,TB}(industry_of_firm, essential_industry, essential_firm)
 
-function IndustryInfo(
+IndustryInfo(
     industry_of_firm::AbstractVector{<:Integer},
     input_classification::AbstractMatrix{Bool},
+) = throw(
+    ArgumentError(
+        "Boolean input_classification is ambiguous; use integer codes 0, 1, and 2",
+    ),
 )
-    throw(
-        ArgumentError(
-            "Boolean input_classification is ambiguous; use integer codes 0, 1, and 2",
-        ),
-    )
-end
 
 function IndustryInfo(
     industry_of_firm::AbstractVector{<:Integer},

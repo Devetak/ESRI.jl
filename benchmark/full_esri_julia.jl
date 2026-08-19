@@ -12,10 +12,11 @@ classification_name in ("ihs", "legacy", "linear") ||
 n = parse(Int, get(ENV, "ESRI_BENCHMARK_FIRMS", "10000"))
 workers = parse(Int, get(ENV, "ESRI_BENCHMARK_WORKERS", "8"))
 convergence_tol = parse(Float64, get(ENV, "ESRI_CONVERGENCE_TOL", "1e-2"))
-isfinite(convergence_tol) && convergence_tol > 0 || error("ESRI_CONVERGENCE_TOL must be positive")
-workers <= Threads.nthreads() ||
-    error("Start Julia with at least $workers threads")
-output_root = get(ENV, "ESRI_OUTPUT_DIR", joinpath("results", "full_esri_matrix_comparison"))
+isfinite(convergence_tol) && convergence_tol > 0 ||
+    error("ESRI_CONVERGENCE_TOL must be positive")
+workers <= Threads.nthreads() || error("Start Julia with at least $workers threads")
+output_root =
+    get(ENV, "ESRI_OUTPUT_DIR", joinpath("results", "full_esri_matrix_comparison"))
 network_path = get(ENV, "ESRI_NETWORK_FILE", "")
 isfile(network_path) || error("Set ESRI_NETWORK_FILE to the shared power-law edge CSV")
 case_dir = joinpath(output_root, "$(classification_name)_$(n)")
@@ -52,10 +53,7 @@ all(supplier .!= customer) || error("Power-law network contains self-links")
 all(isfinite, weights) && all(weights .> 0) || error("Network weights must be positive")
 weight_matrix = sparse(supplier, customer, weights, n, n)
 nnz(weight_matrix) == length(weights) || error("Power-law network contains duplicate links")
-econ = ESRIEconomy(
-    weight_matrix,
-    IndustryInfo(industry_of_firm, classification),
-)
+econ = ESRIEconomy(weight_matrix, IndustryInfo(industry_of_firm, classification))
 network_data = supplier = customer = weights = weight_matrix = nothing
 GC.gc()
 
@@ -103,10 +101,12 @@ within_tolerance = max_abs_score_difference <= convergence_tol
 julia_total_esri = sum(scores)
 cpp_total_esri = sum(cpp_scores)
 abs_total_esri_difference = abs(julia_total_esri - cpp_total_esri)
-within_tolerance || @warn "Julia/FastCascade score difference exceeds convergence tolerance" max_abs_score_difference convergence_tol
+within_tolerance ||
+    @warn "Julia/FastCascade score difference exceeds convergence tolerance" max_abs_score_difference convergence_tol
 
 summary = Dict(
-    split(line, '='; limit = 2) for line in readlines(joinpath(case_dir, "cpp_summary.txt"))
+    split(line, '='; limit = 2) for
+    line in readlines(joinpath(case_dir, "cpp_summary.txt"))
 )
 cpp_total_s = parse(Float64, summary["cpp_total_s"])
 

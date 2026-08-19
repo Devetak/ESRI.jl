@@ -23,7 +23,8 @@ industry_ids = [get(industry_by_nace2, nace2(code), 0) for code in production_co
     @test all(isfinite, reference)
     @test all(reference .>= 0)
 
-    economy = ESRIEconomy(weight_matrix, IndustryInfo(industry_ids, ihs_input_classification()))
+    economy =
+        ESRIEconomy(weight_matrix, IndustryInfo(industry_ids, ihs_input_classification()))
     for (combine, column) in ((:min, 1), (:downstream, 2), (:upstream, 3))
         scores = esri(economy; combine = combine)
         @test isapprox(scores, reference[:, column]; atol = 1e-6, rtol = 0)

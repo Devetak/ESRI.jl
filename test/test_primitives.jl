@@ -25,10 +25,10 @@
 
     W3 = sparse([1, 3], [2, 1], [2.0, 4.0], 4, 4)
     info3 = IndustryInfo([1, 2, 1, 2], [true, false])
-    u3_dense = ESRI.create_upstream_impact_matrix(Matrix(W3))
-    u3_sparse = ESRI.create_upstream_impact_matrix(W3)
-    e3_dense, n3_dense = ESRI.compute_downstream_impact_matrices(Matrix(W3), info3)
-    e3_sparse, n3_sparse = ESRI.compute_downstream_impact_matrices(W3, info3)
+    u3_dense = ESRIcascade.create_upstream_impact_matrix(Matrix(W3))
+    u3_sparse = ESRIcascade.create_upstream_impact_matrix(W3)
+    e3_dense, n3_dense = ESRIcascade.compute_downstream_impact_matrices(Matrix(W3), info3)
+    e3_sparse, n3_sparse = ESRIcascade.compute_downstream_impact_matrices(W3, info3)
 
     @test Matrix(u3_sparse) ≈ u3_dense atol = 1e-12 rtol = 0
     @test Matrix(e3_sparse) ≈ e3_dense atol = 1e-12 rtol = 0
@@ -36,6 +36,128 @@
     @test Matrix(u3_sparse)[:, 2] == zeros(4)
     @test Matrix(e3_sparse)[:, 4] == zeros(4)
     @test Matrix(n3_sparse)[:, 4] == zeros(4)
+end
+
+@testset "Per-customer input classifications" begin
+    W = [
+        0.0 0.0 0.0 2.0
+        0.0 0.0 0.0 3.0
+        0.0 0.0 0.0 5.0
+        0.0 0.0 0.0 7.0
+    ]
+    info = IndustryInfo(
+        [1, 1, 2, 3],
+        [
+            0 0 2
+            0 0 1
+            1 0 0
+        ],
+    )
+
+    essential_dense, nonessential_dense =
+        ESRIcascade.compute_downstream_impact_matrices(W, info)
+    essential_sparse, nonessential_sparse =
+        ESRIcascade.compute_downstream_impact_matrices(sparse(W), info)
+
+    @test essential_dense[1, 4] == 2 / 5
+    @test essential_dense[2, 4] == 3 / 5
+    @test essential_dense[3, 4] == 0
+    @test essential_dense[4, 4] == 0
+    @test nonessential_dense[3, 4] == 5 / 17
+    @test nonessential_dense[1, 4] == 0
+    @test nonessential_dense[2, 4] == 0
+    @test nonessential_dense[4, 4] == 0
+    @test Matrix(essential_sparse) == essential_dense
+    @test Matrix(nonessential_sparse) == nonessential_dense
+    @test length(essential_sparse.nzval) == 2
+    @test length(nonessential_sparse.nzval) == 1
+end
+
+@testset "Legacy Boolean classification parity" begin
+    W = [
+        1.0 2.0 0.0 0.0
+        0.0 1.0 3.0 0.0
+        4.0 0.0 1.0 5.0
+        0.0 6.0 0.0 1.0
+    ]
+    industries = [1, 1, 2, 3]
+    legacy = IndustryInfo(industries, [true, false, true])
+    classified = IndustryInfo(
+        industries,
+        [
+            2 2 2
+            1 1 1
+            2 2 2
+        ],
+    )
+    @test legacy.input_classification == classified.input_classification
+
+    for weights in (W, sparse(W))
+        legacy_essential, legacy_nonessential =
+            ESRIcascade.compute_downstream_impact_matrices(weights, legacy)
+        classified_essential, classified_nonessential =
+            ESRIcascade.compute_downstream_impact_matrices(weights, classified)
+        @test Matrix(classified_essential) == Matrix(legacy_essential)
+        @test Matrix(classified_nonessential) == Matrix(legacy_nonessential)
+    end
+
+    legacy_econ = ESRIEconomy(sparse(W), legacy)
+    classified_econ = ESRIEconomy(sparse(W), classified)
+    @test esri(classified_econ; maxiter = 60, tol = 1e-10) ==
+          esri(legacy_econ; maxiter = 60, tol = 1e-10)
+
+    shock = [0.0, 1.0, 0.6, 1.0]
+    legacy_result =
+        esri_shock(legacy_econ, shock; details = true, maxiter = 60, tol = 1e-10)
+    classified_result =
+        esri_shock(classified_econ, shock; details = true, maxiter = 60, tol = 1e-10)
+    @test classified_result.esri == legacy_result.esri
+    @test classified_result.upstream == legacy_result.upstream
+    @test classified_result.downstream == legacy_result.downstream
+end
+
+@testset "C++ purely linear default parity" begin
+    W = sparse([1, 2, 3], [3, 3, 4], [2.0, 3.0, 5.0], 4, 4)
+    industries = [1, 2, 3, 4]
+    scores = esri(ESRIEconomy(W, IndustryInfo(industries)); maxiter = 10, tol = 1e-12)
+    explicit = ESRIEconomy(W, IndustryInfo(industries, fill(1, 4, 4)))
+    @test scores == esri(explicit; maxiter = 10, tol = 1e-12)
+    @test scores ≈ [0.4, 0.6, 1.0, 1.0] atol = 1e-12 rtol = 0
+end
+
+@testset "C++ mixed-classification parity" begin
+    W = [
+        0.0 3.0 2.0 7.0 5.0 11.0
+        4.0 0.0 9.0 1.0 8.0 6.0
+        10.0 2.0 0.0 4.0 3.0 7.0
+        6.0 5.0 1.0 0.0 9.0 2.0
+        8.0 3.0 6.0 10.0 0.0 4.0
+        2.0 7.0 5.0 3.0 11.0 0.0
+    ]
+    info = IndustryInfo(
+        [1, 2, 3, 1, 2, 3],
+        [
+            2 1 0
+            0 2 1
+            1 0 2
+        ],
+    )
+
+    dense_econ = ESRIEconomy(W, info)
+    econ = ESRIEconomy(sparse(W), info)
+    permuted = ESRIcascade._permute_sparse_economy(econ, [2, 1, 3, 4, 5, 6])
+    @test permuted.info.input_classification == info.input_classification
+
+    @test esri(econ; combine = :downstream, maxiter = 150, tol = 1e-12) ≈
+          esri(dense_econ; combine = :downstream, maxiter = 150, tol = 1e-12) atol = 1e-12 rtol =
+        0
+
+    result =
+        esri(econ, 1; details = true, combine = :downstream, maxiter = 150, tol = 1e-12)
+    @test result.esri ≈ 0.50687988214742541 atol = 1e-12 rtol = 0
+    @test result.downstream ≈
+          [0.0, 0.6, 0.7894068197483480, 0.0, 0.6111111111111110, 0.8786670560685980] atol =
+        1e-12 rtol = 0
 end
 
 @testset "Propagation kernels" begin
@@ -50,7 +172,15 @@ end
     non = [0.0 0.2 0.0; 0.0 0.0 1.0; 0.0 0.0 0.0]
     emat = zeros(3, 2)
     nvec = zeros(3)
-    ESRIcascade._accumulate_downstream_components!(emat, nvec, hd, [0.5, 1.0, 0.2], ess, non, info)
+    ESRIcascade._accumulate_downstream_components!(
+        emat,
+        nvec,
+        hd,
+        [0.5, 1.0, 0.2],
+        ess,
+        non,
+        info,
+    )
     @test emat ≈ [0.45 0.0; 0.0 0.0; 0.0 0.0] atol = 1e-12 rtol = 0
     @test nvec ≈ [0.0, 0.02, 0.7] atol = 1e-12 rtol = 0
 
@@ -59,12 +189,46 @@ end
     @test out ≈ [0.55, 0.5, 0.3] atol = 1e-12 rtol = 0
 
     curr_u = zeros(2)
-    ESRIcascade.upstream_step!(curr_u, [0.0 0.5; 1.0 0.0], [0.6, 0.8], [1.0, 0.7], [1.0, 0.0])
+    ESRIcascade.upstream_step!(
+        curr_u,
+        [0.0 0.5; 1.0 0.0],
+        [0.6, 0.8],
+        [1.0, 0.7],
+        [1.0, 0.0],
+    )
     @test curr_u ≈ [0.8, 0.7] atol = 1e-12 rtol = 0
 
     curr_u_sp = zeros(2)
-    ESRIcascade.upstream_step!(curr_u_sp, sparse([0.0 0.5; 1.0 0.0]), [0.6, 0.8], [1.0, 0.7], [1.0, 0.0])
+    ESRIcascade.upstream_step!(
+        curr_u_sp,
+        sparse([0.0 0.5; 1.0 0.0]),
+        [0.6, 0.8],
+        [1.0, 0.7],
+        [1.0, 0.0],
+    )
     @test curr_u_sp ≈ curr_u atol = 1e-12 rtol = 0
+end
+
+@testset "Sparse downstream parity" begin
+    W = [
+        0.0 2.0 3.0 1.0
+        4.0 0.0 5.0 2.0
+        6.0 1.0 0.0 3.0
+        2.0 4.0 1.0 0.0
+    ]
+    info = IndustryInfo([1, 1, 2, 2], [2 1; 1 2])
+    psi = [0.0, 1.0, 0.4, 0.8]
+    dense = ESRIEconomy(W, info)
+    sparse_econ = ESRIEconomy(sparse(W), info)
+
+    dense_scores = esri(dense; firm_indices = 1:4, maxiter = 80, tol = 1e-12)
+    sparse_scores = esri(sparse_econ; firm_indices = 1:4, maxiter = 80, tol = 1e-12)
+    @test sparse_scores ≈ dense_scores atol = 1e-12 rtol = 0
+
+    dense_result = esri_shock(dense, psi; details = true, maxiter = 80, tol = 1e-12)
+    sparse_result = esri_shock(sparse_econ, psi; details = true, maxiter = 80, tol = 1e-12)
+    @test sparse_result.esri ≈ dense_result.esri atol = 1e-12 rtol = 0
+    @test sparse_result.downstream ≈ dense_result.downstream atol = 1e-12 rtol = 0
 end
 
 @testset "Integer helper inputs" begin

@@ -1,12 +1,25 @@
 """
     IndustryInfo(industry_of_firm, essential_industry)
+    IndustryInfo(industry_of_firm, input_classification)
+    IndustryInfo(industry_of_firm)
 
-Firm industry ids and per-industry essentiality flags.
+Firm industry ids and supplier-by-customer industry input classes. The
+`input_classification` matrix is square and integer-coded; Boolean matrices are
+rejected. In `input_classification[supplier, customer]`, `0` adds no direct
+downstream term but remains in the class-`1` normalization denominator, `1`
+selects the linear downstream term, and `2` selects the essential downstream
+term. Every class remains in the weight matrix and upstream propagation.
+
+The Boolean-vector form maps essential industries to `2` and the remaining
+industries to `1`. The one-argument form classifies every pair as `1`, giving a
+purely linear baseline. The compatibility fields `essential_industry` and
+`essential_firm` are true for supplier-industry rows consisting entirely of `2`s.
 """
 struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
     industry_of_firm::TI
     essential_industry::TB
     essential_firm::TB
+    input_classification::Matrix{UInt8}
 end
 
 """
@@ -25,10 +38,23 @@ struct ESRIEconomy{T,I<:IndustryInfo,TU,TD,VT<:AbstractVector{T}}
     n::Int
 end
 
+struct _ESRIWorkspace{T}
+    current_upstream::Vector{T}
+    previous_upstream::Vector{T}
+    current_downstream::Vector{T}
+    previous_downstream::Vector{T}
+    sigmas::Vector{T}
+    essential_matrix::Matrix{T}
+    essential_touched::Vector{Int}
+    temp_sums::Vector{T}
+    nonessential_vector::Vector{T}
+    psi::Vector{T}
+end
+
 """
     ESRIResult
 
-Single-scenario ESRI plus converged upstream and downstream states.
+Single-scenario ESRI plus the final upstream and downstream states.
 """
 struct ESRIResult{T}
     esri::T
@@ -36,45 +62,85 @@ struct ESRIResult{T}
     downstream::Vector{T}
 end
 
-"""
-    IndustryInfo(industry_of_firm::AbstractVector{<:Integer}, essential_industry::AbstractVector{Bool})
+function IndustryInfo(industry_of_firm::AbstractVector{<:Integer})
+    isempty(industry_of_firm) && throw(ArgumentError("industry_of_firm must be non-empty"))
+    return IndustryInfo(industry_of_firm, falses(maximum(industry_of_firm)))
+end
 
-Build immutable industry metadata for ESRI.
-`industry_of_firm[i]` is the 1-based industry id of firm `i`.
-`essential_industry[k]` marks whether industry `k` is essential.
-"""
+function _industry_indices(industry_of_firm::AbstractVector{<:Integer}, nindustries::Int)
+    nindustries > 0 || throw(ArgumentError("essential_industry must be non-empty"))
+    indices = Int.(industry_of_firm)
+    all(idx -> 1 <= idx <= nindustries, indices) || throw(
+        ArgumentError("industry_of_firm values must be in 1:length(essential_industry)"),
+    )
+    return indices
+end
+
 function IndustryInfo(
     industry_of_firm::AbstractVector{<:Integer},
     essential_industry::AbstractVector{Bool},
 )
-    if isempty(essential_industry)
-        throw(ArgumentError("essential_industry must be non-empty"))
-    end
+    nindustries = length(essential_industry)
+    firm_industry = _industry_indices(industry_of_firm, nindustries)
+    essential_industry = Vector{Bool}(essential_industry)
+    return IndustryInfo(
+        firm_industry,
+        essential_industry,
+        essential_industry[firm_industry],
+    )
+end
 
-    firm_industry = Vector{Int}(undef, length(industry_of_firm))
-    essential_industry_vec = Vector{Bool}(essential_industry)
-    max_industry = length(essential_industry_vec)
+# Keep the pre-classification three-field constructor usable.  Its matrix view
+# has the same row-constant 2/1 semantics as the old Boolean API.
+IndustryInfo{TI,TB}(
+    industry_of_firm::TI,
+    essential_industry::TB,
+    essential_firm::TB,
+) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}} = IndustryInfo{TI,TB}(
+    industry_of_firm,
+    essential_industry,
+    essential_firm,
+    repeat(UInt8.(essential_industry) .+ UInt8(1), 1, length(essential_industry)),
+)
 
-    @inbounds for i in eachindex(industry_of_firm)
-        idx = Int(industry_of_firm[i])
-        if idx < 1 || idx > max_industry
-            throw(ArgumentError("industry_of_firm values must be in 1:length(essential_industry)"))
-        end
-        firm_industry[i] = idx
-    end
+IndustryInfo(
+    industry_of_firm::TI,
+    essential_industry::TB,
+    essential_firm::TB,
+) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}} =
+    IndustryInfo{TI,TB}(industry_of_firm, essential_industry, essential_firm)
 
-    essential_firm = Vector{Bool}(undef, length(firm_industry))
-    @inbounds for i in eachindex(firm_industry)
-        essential_firm[i] = essential_industry_vec[firm_industry[i]]
-    end
+IndustryInfo(
+    industry_of_firm::AbstractVector{<:Integer},
+    input_classification::AbstractMatrix{Bool},
+) = throw(
+    ArgumentError(
+        "Boolean input_classification is ambiguous; use integer codes 0, 1, and 2",
+    ),
+)
 
-    return IndustryInfo(firm_industry, essential_industry_vec, essential_firm)
+function IndustryInfo(
+    industry_of_firm::AbstractVector{<:Integer},
+    input_classification::AbstractMatrix{<:Integer},
+)
+    nindustries, ncustomers = size(input_classification)
+    nindustries == ncustomers ||
+        throw(DimensionMismatch("input_classification must be square"))
+    classification = Matrix{UInt8}(input_classification)
+    essential_industry = vec(all(==(UInt8(2)), classification; dims = 2))
+    firm_industry = _industry_indices(industry_of_firm, nindustries)
+    return IndustryInfo(
+        firm_industry,
+        essential_industry,
+        essential_industry[firm_industry],
+        classification,
+    )
 end
 
 Base.length(info::IndustryInfo) = length(info.industry_of_firm)
 Base.length(econ::ESRIEconomy) = econ.n
 
-num_industries(info::IndustryInfo) = length(info.essential_industry)
+num_industries(info::IndustryInfo) = size(info.input_classification, 1)
 
 @inline function is_essential(info::IndustryInfo, idx::Integer)
     @boundscheck checkbounds(info.essential_firm, idx)

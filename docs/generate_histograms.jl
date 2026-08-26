@@ -1,23 +1,17 @@
-using ESRI
+using ESRIcascade
 using Plots
 using Random
 using SparseArrays
 
 const OUTDIR = joinpath(@__DIR__, "src", "assets")
 
-default(
-    fmt = :svg,
-    size = (760, 420),
-    legend = false,
-    grid = :y,
-    linewidth = 0,
-)
+default(fmt = :svg, size = (760, 420), legend = false, grid = :y, linewidth = 0)
 
 function build_demo_economy()
     Random.seed!(42)
     n = 1_000
     W = sprand(n, n, 0.01)
-    W[1:n+1:end] .= 0
+    W[1:(n+1):end] .= 0
     info = IndustryInfo(rand(1:4, n), [true, true, false, false])
     return ESRIEconomy(W, info), W
 end
@@ -48,6 +42,7 @@ function plot_score_comparison(values_a, values_b, label_a, label_b, title, path
         alpha = 0.45,
         color = :steelblue,
         label = label_a,
+        legend = :topright,
         xlabel = "ESRI score",
         ylabel = "Density",
         title = title,
@@ -74,7 +69,11 @@ mkpath(OUTDIR)
 econ, W = build_demo_economy()
 
 scores = esri(econ; maxiter = 40, tol = 1e-3, threads = false)
-plot_scores(scores, "Distribution of default firm-shock ESRI scores", joinpath(OUTDIR, "scores_hist.svg"))
+plot_scores(
+    scores,
+    "Distribution of default firm-shock ESRI scores",
+    joinpath(OUTDIR, "scores_hist.svg"),
+)
 
 output_weights = vec(sum(W; dims = 2))
 scores_output = esri(
@@ -105,7 +104,8 @@ plot_score_comparison(
 )
 
 subset_indices = collect(25:25:1_000)
-subset_scores = esri(econ; firm_indices = subset_indices, maxiter = 20, tol = 1e-3, threads = false)
+subset_scores =
+    esri(econ; firm_indices = subset_indices, maxiter = 20, tol = 1e-3, threads = false)
 selected_scores = subset_scores[subset_scores .> 0]
 plot_scores(
     selected_scores,

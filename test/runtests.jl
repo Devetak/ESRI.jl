@@ -11,6 +11,7 @@ include("test_primitives.jl")
 include("test_core_api.jl")
 include("test_new_options.jl")
 include("test_regressions.jl")
+include("test_ESRI_ICIO.jl")
 
 if "quality" in ARGS
     include("test_quality.jl")

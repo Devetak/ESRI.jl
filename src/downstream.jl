@@ -1,98 +1,3 @@
-@inline function _scatter_essential_column!(
-    essential_matrix::AbstractMatrix{T},
-    industry::Int,
-    customers::AbstractVector{Int},
-    values::AbstractVector{T},
-    start_idx::Int,
-    stop_idx::Int,
-    factor::T,
-) where {T}
-    len = stop_idx - start_idx + 1
-    if len <= 0
-        return nothing
-    elseif len == 1
-        i1 = start_idx
-        essential_matrix[customers[i1], industry] += factor * values[i1]
-        return nothing
-    elseif len == 2
-        i1 = start_idx
-        i2 = start_idx + 1
-        essential_matrix[customers[i1], industry] += factor * values[i1]
-        essential_matrix[customers[i2], industry] += factor * values[i2]
-        return nothing
-    elseif len == 3
-        i1 = start_idx
-        i2 = start_idx + 1
-        i3 = start_idx + 2
-        essential_matrix[customers[i1], industry] += factor * values[i1]
-        essential_matrix[customers[i2], industry] += factor * values[i2]
-        essential_matrix[customers[i3], industry] += factor * values[i3]
-        return nothing
-    elseif len == 4
-        i1 = start_idx
-        i2 = start_idx + 1
-        i3 = start_idx + 2
-        i4 = start_idx + 3
-        essential_matrix[customers[i1], industry] += factor * values[i1]
-        essential_matrix[customers[i2], industry] += factor * values[i2]
-        essential_matrix[customers[i3], industry] += factor * values[i3]
-        essential_matrix[customers[i4], industry] += factor * values[i4]
-        return nothing
-    end
-
-    @inbounds for idx = start_idx:stop_idx
-        essential_matrix[customers[idx], industry] += factor * values[idx]
-    end
-    return nothing
-end
-
-@inline function _scatter_nonessential!(
-    nonessential_vector::AbstractVector{T},
-    customers::AbstractVector{Int},
-    values::AbstractVector{T},
-    start_idx::Int,
-    stop_idx::Int,
-    factor::T,
-) where {T}
-    len = stop_idx - start_idx + 1
-    if len <= 0
-        return nothing
-    elseif len == 1
-        i1 = start_idx
-        nonessential_vector[customers[i1]] += factor * values[i1]
-        return nothing
-    elseif len == 2
-        i1 = start_idx
-        i2 = start_idx + 1
-        nonessential_vector[customers[i1]] += factor * values[i1]
-        nonessential_vector[customers[i2]] += factor * values[i2]
-        return nothing
-    elseif len == 3
-        i1 = start_idx
-        i2 = start_idx + 1
-        i3 = start_idx + 2
-        nonessential_vector[customers[i1]] += factor * values[i1]
-        nonessential_vector[customers[i2]] += factor * values[i2]
-        nonessential_vector[customers[i3]] += factor * values[i3]
-        return nothing
-    elseif len == 4
-        i1 = start_idx
-        i2 = start_idx + 1
-        i3 = start_idx + 2
-        i4 = start_idx + 3
-        nonessential_vector[customers[i1]] += factor * values[i1]
-        nonessential_vector[customers[i2]] += factor * values[i2]
-        nonessential_vector[customers[i3]] += factor * values[i3]
-        nonessential_vector[customers[i4]] += factor * values[i4]
-        return nothing
-    end
-
-    @inbounds for idx = start_idx:stop_idx
-        nonessential_vector[customers[idx]] += factor * values[idx]
-    end
-    return nothing
-end
-
 function compute_sigmas!(
     sigmas::AbstractVector,
     row_sums::AbstractVector,
@@ -149,66 +54,57 @@ function _accumulate_downstream_components!(
             continue
         end
         @simd for customer = 1:ncustomers
-            essential_matrix[customer, industry] += factor * essential_impact[supplier, customer]
-            nonessential_vector[customer] += factor * nonessential_impact[supplier, customer]
+            essential_matrix[customer, industry] +=
+                factor * essential_impact[supplier, customer]
+            nonessential_vector[customer] +=
+                factor * nonessential_impact[supplier, customer]
         end
     end
     return nothing
 end
 
-function _accumulate_downstream_components!(
-    essential_matrix::AbstractMatrix,
-    nonessential_vector::AbstractVector,
-    downstream_vector::AbstractVector,
-    sigmas::AbstractVector,
+function _accumulate_active_sparse_downstream_components!(
+    essential_matrix::Matrix{T},
+    essential_touched::Vector{Int},
+    nonessential_vector::AbstractVector{T},
+    downstream_vector::AbstractVector{T},
+    sigmas::AbstractVector{T},
     essential_impact::SparseMatrixCSR,
     nonessential_impact::SparseMatrixCSR,
     info::IndustryInfo,
     industry_map::AbstractVector{Int} = info.industry_of_firm,
-)
-    T = eltype(essential_matrix)
+) where {T}
+    zeroT = zero(T)
     oneT = one(T)
 
-    fill!(essential_matrix, zero(T))
-    fill!(nonessential_vector, zero(T))
+    fill!(nonessential_vector, zeroT)
 
     essential_rowptr = essential_impact.rowptr
     essential_colval = essential_impact.colval
     essential_vals = essential_impact.nzval
-
     nonessential_rowptr = nonessential_impact.rowptr
     nonessential_colval = nonessential_impact.colval
     nonessential_vals = nonessential_impact.nzval
 
+    sizehint!(essential_touched, length(essential_vals))
     nfirms = length(downstream_vector)
+    ncustomers = size(essential_matrix, 1)
     @inbounds for supplier = 1:nfirms
-        industry = industry_map[supplier]
         factor = sigmas[supplier] * (oneT - downstream_vector[supplier])
-        if factor == 0
-            continue
-        end
-        essential_start = essential_rowptr[supplier]
-        essential_stop = essential_rowptr[supplier + 1] - 1
-        _scatter_essential_column!(
-            essential_matrix,
-            industry,
-            essential_colval,
-            essential_vals,
-            essential_start,
-            essential_stop,
-            factor,
-        )
+        factor == zeroT && continue
+        industry = industry_map[supplier]
 
-        nonessential_start = nonessential_rowptr[supplier]
-        nonessential_stop = nonessential_rowptr[supplier + 1] - 1
-        _scatter_nonessential!(
-            nonessential_vector,
-            nonessential_colval,
-            nonessential_vals,
-            nonessential_start,
-            nonessential_stop,
-            factor,
-        )
+        for idx = essential_rowptr[supplier]:(essential_rowptr[supplier+1]-1)
+            linear_idx = essential_colval[idx] + (industry - 1) * ncustomers
+            if essential_matrix[linear_idx] == zeroT
+                push!(essential_touched, linear_idx)
+            end
+            essential_matrix[linear_idx] += factor * essential_vals[idx]
+        end
+
+        for idx = nonessential_rowptr[supplier]:(nonessential_rowptr[supplier+1]-1)
+            nonessential_vector[nonessential_colval[idx]] += factor * nonessential_vals[idx]
+        end
     end
     return nothing
 end
@@ -221,17 +117,46 @@ function downstream_step!(
 )
     n = size(essential_matrix, 1)
     ncols = size(essential_matrix, 2)
-    @inbounds for firm_idx = 1:n
-        essential_shortage = zero(eltype(downstream_vector))
-        for col = 1:ncols
-            val = essential_matrix[firm_idx, col]
-            if val > essential_shortage
-                essential_shortage = val
-            end
+    fill!(downstream_vector, zero(eltype(downstream_vector)))
+    @inbounds for col = 1:ncols
+        @simd for firm_idx = 1:n
+            downstream_vector[firm_idx] =
+                max(downstream_vector[firm_idx], essential_matrix[firm_idx, col])
         end
-        essential_health = one(eltype(downstream_vector)) - essential_shortage
+    end
+    @inbounds for firm_idx = 1:n
+        essential_health = one(eltype(downstream_vector)) - downstream_vector[firm_idx]
         nonessential_health = one(eltype(downstream_vector)) - nonessential_vector[firm_idx]
-        downstream_vector[firm_idx] = min(essential_health, nonessential_health, psi[firm_idx])
+        downstream_vector[firm_idx] =
+            min(essential_health, nonessential_health, psi[firm_idx])
+    end
+    return downstream_vector
+end
+
+function downstream_step!(
+    downstream_vector::AbstractVector{T},
+    essential_matrix::Matrix{T},
+    essential_touched::Vector{Int},
+    nonessential_vector::AbstractVector{T},
+    psi::AbstractVector{T},
+) where {T}
+    zeroT = zero(T)
+    oneT = one(T)
+    n = size(essential_matrix, 1)
+    fill!(downstream_vector, zeroT)
+    @inbounds for linear_idx in essential_touched
+        customer = mod(linear_idx - 1, n) + 1
+        downstream_vector[customer] =
+            max(downstream_vector[customer], essential_matrix[linear_idx])
+        essential_matrix[linear_idx] = zeroT
+    end
+    empty!(essential_touched)
+
+    @inbounds for firm_idx in eachindex(downstream_vector)
+        essential_health = oneT - downstream_vector[firm_idx]
+        nonessential_health = oneT - nonessential_vector[firm_idx]
+        downstream_vector[firm_idx] =
+            min(essential_health, nonessential_health, psi[firm_idx])
     end
     return downstream_vector
 end
@@ -249,14 +174,7 @@ function downstream_shock!(
     temp_sums::AbstractVector;
     industry_map::AbstractVector{Int} = info.industry_of_firm,
 )
-    compute_sigmas!(
-        sigmas,
-        row_sums,
-        current_downstream,
-        info,
-        temp_sums,
-        industry_map,
-    )
+    compute_sigmas!(sigmas, row_sums, current_downstream, info, temp_sums, industry_map)
 
     _accumulate_downstream_components!(
         essential_matrix,
@@ -270,4 +188,115 @@ function downstream_shock!(
     )
     downstream_step!(current_downstream, essential_matrix, nonessential_vector, psi)
     return nothing
+end
+
+function downstream_shock!(
+    essential_impact::SparseMatrixCSR,
+    nonessential_impact::SparseMatrixCSR,
+    info::IndustryInfo,
+    row_sums::AbstractVector{T},
+    psi::AbstractVector{T},
+    sigmas::AbstractVector{T},
+    essential_matrix::Matrix{T},
+    nonessential_vector::AbstractVector{T},
+    current_downstream::AbstractVector{T},
+    temp_sums::AbstractVector{T};
+    industry_map::AbstractVector{Int} = info.industry_of_firm,
+) where {T}
+    fill!(essential_matrix, zero(T))
+    return downstream_shock!(
+        essential_impact,
+        nonessential_impact,
+        info,
+        row_sums,
+        psi,
+        sigmas,
+        essential_matrix,
+        nonessential_vector,
+        current_downstream,
+        temp_sums,
+        Int[];
+        industry_map = industry_map,
+    )
+end
+
+function downstream_shock!(
+    essential_impact,
+    nonessential_impact,
+    info::IndustryInfo,
+    row_sums::AbstractVector,
+    psi::AbstractVector,
+    sigmas::AbstractVector,
+    essential_matrix::Matrix,
+    nonessential_vector::AbstractVector,
+    current_downstream::AbstractVector,
+    temp_sums::AbstractVector,
+    essential_touched::Vector{Int};
+    industry_map::AbstractVector{Int} = info.industry_of_firm,
+)
+    return downstream_shock!(
+        essential_impact,
+        nonessential_impact,
+        info,
+        row_sums,
+        psi,
+        sigmas,
+        essential_matrix,
+        nonessential_vector,
+        current_downstream,
+        temp_sums;
+        industry_map = industry_map,
+    )
+end
+
+function downstream_shock!(
+    essential_impact::SparseMatrixCSR,
+    nonessential_impact::SparseMatrixCSR,
+    info::IndustryInfo,
+    row_sums::AbstractVector{T},
+    psi::AbstractVector{T},
+    sigmas::AbstractVector{T},
+    essential_matrix::Matrix{T},
+    nonessential_vector::AbstractVector{T},
+    current_downstream::AbstractVector{T},
+    temp_sums::AbstractVector{T},
+    essential_touched::Vector{Int};
+    industry_map::AbstractVector{Int} = info.industry_of_firm,
+) where {T}
+    compute_sigmas!(sigmas, row_sums, current_downstream, info, temp_sums, industry_map)
+    _accumulate_active_sparse_downstream_components!(
+        essential_matrix,
+        essential_touched,
+        nonessential_vector,
+        current_downstream,
+        sigmas,
+        essential_impact,
+        nonessential_impact,
+        info,
+        industry_map,
+    )
+    downstream_step!(
+        current_downstream,
+        essential_matrix,
+        essential_touched,
+        nonessential_vector,
+        psi,
+    )
+    return nothing
+end
+
+function _downstream_shock!(econ::ESRIEconomy{T}, workspace::_ESRIWorkspace{T}) where {T}
+    return downstream_shock!(
+        econ.downstream_impact_essential,
+        econ.downstream_impact_nonessential,
+        econ.info,
+        econ.row_sums,
+        workspace.psi,
+        workspace.sigmas,
+        workspace.essential_matrix,
+        workspace.nonessential_vector,
+        workspace.current_downstream,
+        workspace.temp_sums,
+        workspace.essential_touched,
+    )
 end

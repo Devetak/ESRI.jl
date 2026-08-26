@@ -2,24 +2,32 @@
 
 [![Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://devetak.github.io/ESRIcascade.jl/)
 
-ESRIcascade.jl computes, for each firm, the share of the economy that depends on that firm in `[0, 1]`.
+ESRIcascade.jl computes one Economic Systemic Risk Index (ESRI) score per
+firm. Each score measures the economy-wide output loss from a shock to that
+firm and lies in `[0, 1]`.
 
-`ESRIcascade.jl` is a package for computing the Economic Systemic Risk Index for firms in an economy based on the paper by Diem et al.
+The package implements the ESRI framework from Diem et al. for firm-to-firm supply networks.
 
-In this package, `psi[i]` means how much of its normal capacity firm `i` is allowed to use in the scenario you want to study. `psi[i] = 1.0` means normal operation, `psi[i] = 0.0` means the firm is shut down, and values in between mean the firm can still operate, but only partially. This lets you model shocks such as plant closures, energy shortages, sanctions, or transport disruptions and then measure how those shocks spread through the wider economy.
+`psi[i]` sets the capacity fraction available to firm `i` in a scenario.
+`1.0` represents normal capacity. `0.0` represents closure. Values between
+these bounds represent partial capacity. Use `psi` to model plant closures,
+energy shortages, sanctions, and transport disruptions. ESRI measures the
+resulting economy-wide propagation.
 
 ## Installation
 
 ```julia
 using Pkg
-Pkg.add(url = "https://github.com/Devetak/ESRIcascade.jl")
+Pkg.add("ESRIcascade")
 ```
 
-After registration in the General registry:
+Requires Julia 1.12 or later.
+
+For the development version:
 
 ```julia
 using Pkg
-Pkg.add("ESRIcascade")
+Pkg.add(url = "https://github.com/Devetak/ESRIcascade.jl")
 ```
 
 For local development:
@@ -29,11 +37,11 @@ using Pkg
 Pkg.develop(path = "/path/to/ESRIcascade.jl")
 ```
 
-## Quick start (sparse only)
+## Quick start with a sparse network
 
 ```julia
-using ESRIcascade, SparseArrays
-using LinearAlgebra: I
+using ESRIcascade, SparseArrays, Random
+Random.seed!(42)
 
 N = 1_000
 W = sprand(N, N, 0.01)
@@ -42,47 +50,119 @@ info = IndustryInfo(rand(1:4, N), [true, true, false, false]) # industry 1 and 2
 
 econ = ESRIEconomy(W, info) # set up the economy
 scores = esri(econ; maxiter = 40, tol = 1e-3) # compute ESRI for each firm
-nothing
 ```
 
-Example score distribution from the same kind of run:
+`W[i, j]` is the nonnegative supply from supplier `i` to customer `j`.
+
+## Input classifications
+
+The one-argument `IndustryInfo(industry_of_firm)` uses a purely linear production
+function. Choose a Boolean vector or square integer-code matrix to classify
+inputs. Reuse the same `econ` and `esri` calls:
+
+```julia
+# 1. Legacy Boolean mapping expressed through the matrix API.
+industry_of_firm = rand(1:4, N)
+essential_industry = [true, true, false, false]
+input_classification = repeat(
+    UInt8.(essential_industry) .+ UInt8(1),
+    1,
+    length(essential_industry),
+)
+info = IndustryInfo(industry_of_firm, input_classification)
+
+# 2. Bundled IHS matrix.
+# codes = ihs_industry_codes() # ["0111", "0112", ..., "9999"]
+# industry_id = Dict(code => i for (i, code) in pairs(codes)) # "0111" => 1, "0112" => 2, ...
+# industry_of_firm = [industry_id[code] for code in firm_industry_codes] # e.g. ["0111", "0112", ...] -> [1, 2, ...]
+# info = IndustryInfo(industry_of_firm, ihs_input_classification()) # use the bundled 616 × 616 matrix
+
+# 3. Custom matrix: rows = suppliers, columns = customers.
+# input_classification = UInt8[2 1 0; 0 2 1; 1 0 2]
+# industry_of_firm = rand(1:3, N)
+# info = IndustryInfo(industry_of_firm, input_classification)
+
+econ = ESRIEconomy(W, info)
+scores = esri(econ)
+```
+
+The production function uses these input classes:
+
+- `0`: no direct downstream term; the input remains in `W`, upstream
+  propagation, and the class-`1` normalization denominator.
+- `1`: linear downstream input.
+- `2`: essential downstream input.
+
+Example score distribution from the quick start:
 
 ![Histogram of example ESRI scores](docs/src/assets/scores_hist.svg)
 
-If most firms are near zero, most single-firm failures have limited economy-wide spillovers. If the histogram has a heavier right tail, some firm failures create much larger losses across the economy.
+Most firms near zero indicate small economy-wide spillovers from most
+single-firm shocks. A heavier right tail indicates larger losses from selected
+firm shocks.
 
 Build `ESRIEconomy` once and reuse it on the same network.
 
 ## Key calls
 
-- `esri(econ; ...)` computes the default single-firm closure for each selected firm. If `firm_indices` is set, unrequested entries stay zero.
-- `esri(econ, firm_idx; ...)` solves one scenario and returns a scalar, a named tuple, or `ESRIResult`.
-- `esri_shock(econ, psi; ...)` solves one scenario from an explicit capacity cap vector `psi ∈ [0,1]^N`.
-- `final_weights` changes only the numerator of the final ESRI reduction.
-- `shock=psi` on `esri(econ, firm_idx; ...)` replaces the default closure. It does not add a second shock on top.
+- `esri(econ; ...)` computes the default single-firm closure for each selected
+  firm. Set `firm_indices` to select firms; the remaining entries stay zero.
+- `esri(econ, firm_idx; ...)` solves one scenario and returns a scalar, a named
+  tuple, or `ESRIResult`.
+- `esri_shock(econ, psi; ...)` solves one scenario from an explicit capacity
+  cap vector `psi ∈ [0,1]^N`.
+- `details=true` or `components=:upstream|:downstream|:both` returns the
+  final component states for a single scenario.
+- `final_weights` replaces the weights in the final ESRI reduction. With
+  custom weights, the scalar is the weighted loss divided by
+  `sum(final_weights)`. A zero total weight returns `0`.
+- `shock=psi` on `esri(econ, firm_idx; ...)` supplies the complete capacity-cap scenario.
+- `compute_esri(...)` and `compute_esri_shock(...)` are matrix-first wrappers.
+  They build `ESRIEconomy` and dispatch to the matching call.
 
-## Reference benchmarks
+## Full ESRI C++ reference benchmark
 
-Local reference runs from `2026-04-12` on `Apple M2`, with `JULIA_NUM_THREADS=1`, `mean_degree=7`, `alpha=2.3`, `nindustries=50`, and `maxiter=30`. These timings call full `esri(econ; ...)` over all firms.
+`benchmark/` contains a one-to-one prepared sparse comparison against
+`fastcascade::GL_cascade_dynamics_cpp`. It closes every firm at four network
+sizes under IHS, legacy Boolean essentiality, and all-linear input
+classifications. The Julia runner checks every score and the total ESRI against
+the C++ result.
+See [benchmark/README.md](benchmark/README.md) for the commands and prerequisites.
 
-| mode | firms | nnz | max_degree | p99_degree | top1pct_edge_share | build_s | solve_s |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `truncated_tail` | 5_000 | 35_000 | 111 | 25 | 0.0637 | 0.0312 | 6.5329 |
-| `heavy_tail` | 5_000 | 35_000 | 385 | 26 | 0.0928 | 0.0020 | 5.7411 |
-| `truncated_tail` | 10_000 | 70_000 | 128 | 24 | 0.0616 | 0.0388 | 26.6213 |
-| `heavy_tail` | 10_000 | 70_000 | 964 | 25 | 0.1071 | 0.0334 | 26.4600 |
+### Submitted runtime snapshot
 
-Run with:
+The table below records the supplied benchmark snapshot. Each size uses the
+same deterministic directed truncated power-law network specification. The
+network has mean out-degree 8, exponent 2.3,
+degree cap 128, seed 42, and edges between distinct firms. It reports prepared solve time per
+firm. Speedup is
+`fastcascade` divided by `ESRIcascade.jl`.
+The supplied run uses the benchmark runner's default one-thread BLAS/OpenMP
+setting.
 
-```bash
-julia --project test/perf_full_powerlaw_esri.jl 10000 truncated_tail
-julia --project test/perf_full_powerlaw_esri.jl 10000 heavy_tail
-```
+| Size | Production function | Workers | ESRIcascade.jl (ms per firm) | fastcascade (ms per firm) | Speedup |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 10k | IHS | 1 | 0.777 | 172.422 | 221.91× |
+| 10k | IHS | 4 | 0.296 | 61.432 | 207.43× |
+| 10k | Legacy | 1 | 1.103 | 210.009 | 190.36× |
+| 10k | Legacy | 4 | 0.343 | 72.083 | 210.35× |
+| 10k | Linear | 1 | 0.826 | 250.429 | 303.30× |
+| 10k | Linear | 4 | 0.293 | 86.772 | 295.69× |
+| 100k | IHS | 1 | 9.885 | 1900.390 | 192.25× |
+| 100k | IHS | 4 | 4.222 | 587.493 | 139.16× |
+
+The Julia and `fastcascade` scores matched within the benchmark convergence
+tolerance. The detailed benchmark scope and rerun commands are in
+[`benchmark/README.md`](benchmark/README.md).
 
 ## Reference
 
-Diem, C. et al. *Quantifying firm-level economic systemic risk from nation-wide supply networks* (Scientific Reports, 2022): https://www.nature.com/articles/s41598-022-11522-z
+Diem, C. et al. [*Quantifying firm-level economic systemic risk from
+nation-wide supply networks*](https://www.nature.com/articles/s41598-022-11522-z)
+(Scientific Reports, 2022).
 
 ## License
 
-ESRIcascade.jl is open source and released under the MIT License. See `LICENSE` for details.
+ESRIcascade.jl code is released under the MIT License. The bundled IHS matrix
+and labels are separately CC BY 4.0; see [data/LICENSE.md](data/LICENSE.md) for
+attribution.

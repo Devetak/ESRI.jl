@@ -20,7 +20,7 @@ function old_sparse_downstream_builder(
 
     @inbounds for col = 1:ncols
         start_idx = colptr[col]
-        stop_idx = colptr[col + 1] - 1
+        stop_idx = colptr[col+1] - 1
         if start_idx > stop_idx
             continue
         end
@@ -43,13 +43,15 @@ function old_sparse_downstream_builder(
                 denom = essential_by_industry[ESRIcascade.get_industry(info, row)]
                 essential_vals[idx] = denom == 0 ? zero(T) : val / denom
             else
-                nonessential_vals[idx] = all_suppliers_total == 0 ? zero(T) : val / all_suppliers_total
+                nonessential_vals[idx] =
+                    all_suppliers_total == 0 ? zero(T) : val / all_suppliers_total
             end
         end
     end
 
     essential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), essential_vals)
-    nonessential_csc = SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), nonessential_vals)
+    nonessential_csc =
+        SparseMatrixCSC(nrows, ncols, copy(colptr), copy(rows), nonessential_vals)
 
     I1, J1, V1 = findnz(essential_csc)
     I2, J2, V2 = findnz(nonessential_csc)
@@ -58,9 +60,9 @@ end
 
 function median_elapsed(f; samples::Int = 9, reps::Int = 10)
     times = Vector{Float64}(undef, samples)
-    for s in 1:samples
+    for s = 1:samples
         t0 = time_ns()
-        for _ in 1:reps
+        for _ = 1:reps
             f()
         end
         times[s] = (time_ns() - t0) / 1e9
@@ -81,8 +83,10 @@ function main()
 
     old_ess, old_non = old_call()
     new_ess, new_non = new_call()
-    if !(isapprox(old_ess.nzval, new_ess.nzval; atol = 1e-12, rtol = 1e-12) &&
-         isapprox(old_non.nzval, new_non.nzval; atol = 1e-12, rtol = 1e-12))
+    if !(
+        isapprox(Matrix(old_ess), Matrix(new_ess); atol = 1e-12, rtol = 1e-12) &&
+        isapprox(Matrix(old_non), Matrix(new_non); atol = 1e-12, rtol = 1e-12)
+    )
         error("sparse downstream builder mismatch between old and new implementation")
     end
 

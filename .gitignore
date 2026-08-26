@@ -77,11 +77,18 @@ Temporary Items
 
 .vscode/settings.json
 
-data/
+data/*
+!data/README.md
+!data/LICENSE.md
+!data/ihs_classification.bin
+!data/ihs_industry_codes.txt
+!data/verify_zenodo_ihs.jl
+!data/ICIO/
 results/
 output.txt
 esris.txt
 Economic-Systemic-Risk/
 script.jl
-benchmark/
+benchmark/*.csv
+benchmark/*.txt
 paper/

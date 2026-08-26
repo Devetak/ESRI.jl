@@ -6,11 +6,13 @@ using SparseMatricesCSR
 using ProgressBars
 
 include("types.jl")
+include("ihs_default.jl")
 include("impact.jl")
 include("upstream.jl")
 include("downstream.jl")
 include("esri_computation.jl")
 
-export IndustryInfo, ESRIEconomy, ESRIResult, esri, compute_esri, esri_shock, compute_esri_shock
+export IndustryInfo, ESRIEconomy, ESRIResult, ihs_input_classification, ihs_industry_codes
+export esri, compute_esri, esri_shock, compute_esri_shock
 
 end

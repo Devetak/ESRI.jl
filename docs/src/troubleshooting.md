@@ -1,19 +1,23 @@
 # Troubleshooting
 
-If `ESRIEconomy(W, info)` throws `DimensionMismatch`, then `W` is not square or its size does not match the number of firms in `info`.
+- `ESRIEconomy(W, info)` raises `DimensionMismatch`: use a square `W` with one
+  row and one column per firm in `info`.
+- `IndustryInfo(industry_of_firm, essential_industry)` raises `ArgumentError`:
+  provide one Boolean flag per industry and use ids from
+  `1:length(essential_industry)`.
+- `IndustryInfo(industry_of_firm, input_classification)`: use a square
+  `Matrix{UInt8}` with at least one row and codes `0`, `1`, and `2`. Use matching
+  one-based industry ids. Validate external matrix data before construction.
+- `BoundsError`: use firm ids in `1:econ.n`, including every entry of
+  `firm_indices`.
+- `combine`: choose `:min`, `:upstream`, or `:downstream`.
+- `components`: choose `:none`, `:upstream`, `:downstream`, or `:both`.
+- `shock`: provide `econ.n` finite values in `[0,1]`.
+- `final_weights`: provide `econ.n` finite values `>= 0`.
+- With `firm_indices`, zero values fill the remaining entries by design.
+- In `esri(econ, firm_idx; shock=psi)`, `psi` defines the complete scenario and
+  `firm_idx` selects the single-scenario overload. The default closure uses
+  `firm_idx` when the call uses the default scenario.
 
-If `IndustryInfo(industry_of_firm, essential_industry)` throws `ArgumentError`, then `essential_industry` is empty or some firm industry id lies outside `1:length(essential_industry)`.
-
-If `esri(econ, firm_idx; ...)` throws `BoundsError`, then `firm_idx` is out of range. If `esri(econ; firm_indices=...)` throws `BoundsError`, then one entry of `firm_indices` is out of range.
-
-If `combine` is invalid, the package accepts only `:min`, `:upstream`, and `:downstream`.
-
-If `components` is invalid, the package accepts only `:none`, `:upstream`, `:downstream`, and `:both`.
-
-If `shock` throws `DimensionMismatch`, then its length is not `econ.n`. If `shock` throws `DomainError`, then at least one value is not finite or does not lie in `[0,1]`.
-
-If `final_weights` throws `DimensionMismatch`, then its length is not `econ.n`. If it throws `DomainError`, then at least one value is negative or not finite.
-
-If an economy-wide run with `firm_indices` returns zeros outside the selected set, this is the intended result shape.
-
-If `esri(econ, firm_idx; shock=psi)` does not match the default single-firm shock for `firm_idx`, this is expected. Once `shock=psi` is supplied, `psi` becomes the full scenario and replaces the default closure of `firm_idx`. The argument `firm_idx` no longer defines the shock; it only selects the single-scenario method.
+For benchmark scope and the submitted runtime snapshot, see
+[Performance](performance.md).

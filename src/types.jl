@@ -3,12 +3,17 @@
     IndustryInfo(industry_of_firm, input_classification)
     IndustryInfo(industry_of_firm)
 
-Firm industry ids and input classifications. `input_classification[supplier, customer]`
-is `0` (no downstream impact), `1` (nonessential), or `2` (essential). The
-legacy `essential_industry` and `essential_firm` fields remain for compatibility;
-with matrix-based customer-specific classifications they are true only for rows
-consisting entirely of `2`s. The one-argument form classifies every pair as `1`,
-giving a purely linear baseline.
+Firm industry ids and supplier-by-customer industry input classes. The
+`input_classification` matrix is square and integer-coded; Boolean matrices are
+rejected. In `input_classification[supplier, customer]`, `0` adds no direct
+downstream term but remains in the class-`1` normalization denominator, `1`
+selects the linear downstream term, and `2` selects the essential downstream
+term. Every class remains in the weight matrix and upstream propagation.
+
+The Boolean-vector form maps essential industries to `2` and the remaining
+industries to `1`. The one-argument form classifies every pair as `1`, giving a
+purely linear baseline. The compatibility fields `essential_industry` and
+`essential_firm` are true for supplier-industry rows consisting entirely of `2`s.
 """
 struct IndustryInfo{TI<:AbstractVector{Int},TB<:AbstractVector{Bool}}
     industry_of_firm::TI
@@ -49,7 +54,7 @@ end
 """
     ESRIResult
 
-Single-scenario ESRI plus converged upstream and downstream states.
+Single-scenario ESRI plus the final upstream and downstream states.
 """
 struct ESRIResult{T}
     esri::T
@@ -92,11 +97,11 @@ IndustryInfo{TI,TB}(
     essential_industry::TB,
     essential_firm::TB,
 ) where {TI<:AbstractVector{Int},TB<:AbstractVector{Bool}} = IndustryInfo{TI,TB}(
-        industry_of_firm,
-        essential_industry,
-        essential_firm,
-        repeat(UInt8.(essential_industry) .+ UInt8(1), 1, length(essential_industry)),
-    )
+    industry_of_firm,
+    essential_industry,
+    essential_firm,
+    repeat(UInt8.(essential_industry) .+ UInt8(1), 1, length(essential_industry)),
+)
 
 IndustryInfo(
     industry_of_firm::TI,

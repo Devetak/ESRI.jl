@@ -374,9 +374,13 @@ end
     esri(econ::ESRIEconomy; maxiter=100, tol=1e-2, verbose=false, threads=false,
          firm_indices=nothing, final_weights=nothing, combine=:min)
 
-Compute one default firm shock per selected firm and return one ESRI value per firm.
-Entries outside `firm_indices` stay zero. `final_weights` replaces the final reduction
-weights, and `combine` picks `min(upstream, downstream)`, `upstream`, or `downstream`.
+Compute one full-closure scenario per selected firm and return one ESRI value per firm.
+Set `firm_indices` to select firms; the remaining entries stay zero.
+`threads=true` distributes selected firms across available Julia threads.
+`final_weights` replaces the output weights and normalizes scores by its sum;
+a zero total weight returns `0`. `combine` selects `min(upstream, downstream)`,
+`upstream`, or `downstream`. Each scenario stops when both component changes are
+below `tol` or after `maxiter` iterations. Each score uses the final iterate.
 """
 function esri(
     econ::ESRIEconomy{T};
@@ -427,8 +431,11 @@ end
          shock=nothing)
 
 Solve one scenario and return a scalar, a named tuple, or `ESRIResult`.
-By default the scenario closes `firm_idx`. If `shock` is given, it must lie in `[0, 1]^N`
-and replaces the default closure. `details=true` is shorthand for `components=:both`.
+The default scenario closes `firm_idx`. Supply `shock ∈ [0, 1]^N` to replace
+the default closure. `details=true` is shorthand for `components=:both`.
+The solver stops when both component changes are below `tol` or after `maxiter`
+iterations. Component results contain the final iterate. Custom `final_weights`
+normalize the score by their sum; a zero total weight returns `0`.
 """
 function esri(
     econ::ESRIEconomy{T},
@@ -498,7 +505,10 @@ compute_esri(
                final_weights=nothing, combine=:min)
 
 Solve one scenario from a capacity-cap vector `shock ∈ [0, 1]^N`.
-Return a scalar, a named tuple, or `ESRIResult`.
+Return a scalar, a named tuple, or `ESRIResult`. The solver stops when both
+component changes are below `tol` or after `maxiter` iterations. Component
+results contain the final iterate. Custom `final_weights` normalize the score by
+their sum; a zero total weight returns `0`.
 """
 function esri_shock(
     econ::ESRIEconomy{T},

@@ -1,4 +1,4 @@
-using ESRI
+using ESRIcascade
 using Plots
 using Random
 using SparseArrays
@@ -42,6 +42,7 @@ function plot_score_comparison(values_a, values_b, label_a, label_b, title, path
         alpha = 0.45,
         color = :steelblue,
         label = label_a,
+        legend = :topright,
         xlabel = "ESRI score",
         ylabel = "Density",
         title = title,

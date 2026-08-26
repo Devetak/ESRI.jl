@@ -4,8 +4,9 @@ const _IHS_CLASSIFICATION_CACHE = Ref{Union{Nothing,Matrix{UInt8}}}(nothing)
 """
     ihs_input_classification()
 
-Return a copy of the bundled 616 by 616 IHS supplier-by-customer input-classification
-matrix. Entries are `0`, `1`, and `2`; use [`ihs_industry_codes`](@ref) to map labels.
+Return a copy of the bundled 616 × 616 IHS supplier-by-customer input-classification
+matrix. Entries are `0`, `1`, and `2`. Use [`ihs_industry_codes`](@ref) for the
+row and column order.
 """
 function ihs_input_classification()
     cached = _IHS_CLASSIFICATION_CACHE[]

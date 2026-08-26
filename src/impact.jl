@@ -1,7 +1,8 @@
 """
     create_upstream_impact_matrix(weight_matrix)
 
-Build the normalized upstream impact matrix.
+Build the normalized upstream operator. `weight_matrix[i, j]` is the supply from
+supplier `i` to customer `j`.
 """
 function create_upstream_impact_matrix(weight_matrix::AbstractMatrix{T}) where {T<:Real}
     nrows, ncols = size(weight_matrix)
@@ -223,7 +224,9 @@ end
 """
     ESRIEconomy(weight_matrix, info::IndustryInfo)
 
-Cache normalized upstream/downstream operators, output weights, and totals.
+Cache normalized upstream and downstream operators, output weights, and totals.
+`weight_matrix[i, j]` is the nonnegative supply from supplier `i` to customer
+`j`.
 """
 function ESRIEconomy(weight_matrix::AbstractMatrix{T}, info::IndustryInfo) where {T<:Real}
     n = length(info)

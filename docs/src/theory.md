@@ -1,30 +1,42 @@
 # Mathematical Model
 
-Let `W \in \mathbb{R}_{\ge 0}^{N \times N}` be the firm-to-firm weight matrix with entry `W_{ij}` equal to supply from firm `i` to firm `j`. Let `g(i)` be the industry of firm `i`. The input-classification matrix `C` has one row per supplying industry and one column per customer industry:
+Let ``W \in \mathbb{R}_{\ge 0}^{N \times N}`` be the firm-to-firm weight
+matrix. Entry ``W_{ij}`` is the supply from firm ``i`` to firm ``j``. Let
+``g(i)`` be the industry of firm ``i``. The input-classification matrix ``C`` has one row per
+supplying industry and one column per customer industry:
 
 ```math
 C_{k\ell} \in \{0,1,2\}.
 ```
 
-Here `2` marks industry `k` as essential to industry `\ell`, `1` marks it as non-essential, and `0` gives the link no short-term downstream production effect. The legacy Boolean vector is shorthand for setting each row of `C` entirely to `2` or entirely to `1`.
+Here ``2`` marks industry ``k`` as essential to industry ``\ell``. ``1`` marks
+a linear input. ``0`` keeps the input in ``W`` and the upstream operator and
+contributes to the linear-input denominator. The legacy Boolean vector sets each
+row of ``C`` to ``2`` or ``1``.
 
-The one-argument `IndustryInfo(industry_of_firm)` constructor uses `C = 1`
+The one-argument `IndustryInfo(industry_of_firm)` constructor uses ``C = 1``
 for every supplier-customer pair, giving the purely linear baseline. The
 bundled IHS matrix is opt-in through `ihs_input_classification()`.
 
-The package also uses a capacity-cap vector `\psi \in [0,1]^N`.
+The package also uses a capacity-cap vector ``\psi \in [0,1]^N``.
 
-The entry `\psi_i` is the exogenous capacity cap for firm `i`. In plain terms, firm `i` can operate at at most a `\psi_i` fraction of its normal capacity. This is the main way to describe a shock scenario in the package. You can use it for one closed firm, a partly constrained sector, or a wider event such as an energy shortage, sanctions, or a port disruption. ESRI then shows how that initial shock can move through supply chains and affect the wider economy.
+The entry ``\psi_i`` is the exogenous capacity limit for firm ``i``. The firm
+can operate at up to a ``\psi_i`` fraction of its normal capacity. Use this vector to
+describe a closed firm, a partly constrained sector, or a wider event such as
+an energy shortage, sanctions, or a port disruption. ESRI shows how the initial
+shock moves through supply chains and affects the wider economy.
 
 In simple language:
 
-- `\psi_i = 1` means no exogenous shock to firm `i`.
-- `\psi_i = 0` means firm `i` is fully closed.
-- `0 < \psi_i < 1` means firm `i` is partially capacity constrained.
+- ``\psi_i = 1`` makes full capacity available to firm ``i``.
+- ``\psi_i = 0`` closes firm ``i``.
+- ``0 < \psi_i < 1`` sets a partial capacity limit for firm ``i``.
 
-If all entries of `\psi` are `1`, then no firm is exogenously shocked.
+A vector of ones represents an unshocked economy.
 
-The ESRI score of a firm as presented by Diem et al. is the total loss at a steady state where `\psi` is `1` for all indices except the index corresponding to that firm, where it is `0`. The `\psi` formulation lets you study more realistic cases too: more than one firm can be shocked at once, and the shock does not need to be all-or-nothing.
+The ESRI score in Diem et al. is the share of total steady-state output lost
+after the full closure of one firm. The ``\psi`` formulation also supports
+simultaneous shocks and partial capacity limits.
 
 Define firm output and input totals by
 
@@ -34,11 +46,15 @@ r_i = \sum_{j=1}^N W_{ij},
 c_j = \sum_{i=1}^N W_{ij}.
 ```
 
-Let the exogenous scenario be the vector `\psi \in [0,1]^N`. The package solves for upstream health `u \in [0,1]^N` and downstream health `d \in [0,1]^N`.
+Let the exogenous scenario be the vector ``\psi \in [0,1]^N``. The package
+solves for upstream health ``u \in [0,1]^N`` and downstream health
+``d \in [0,1]^N``.
 
 ## Upstream operator
 
-The upstream operator `U` is
+The upstream operator propagates customer losses to suppliers.
+
+The upstream operator ``U`` is
 
 ```math
 U_{ji} =
@@ -60,13 +76,17 @@ u_i^{(t+1)} =
 
 ## Downstream operators
 
-For each customer `j`, define the total input weight from supplier industry `k` by
+The downstream operators propagate input shortages to customers.
+
+For each customer ``j``, define the total input weight from supplier industry
+``k`` by
 
 ```math
 E_{jk} = \sum_{i=1}^N W_{ij} \, \mathbf{1}_{g(i)=k}.
 ```
 
-Define the essential downstream operator `D^{(e)}` and the non-essential downstream operator `D^{(n)}` by
+Define the essential downstream operator ``D^{(e)}`` and the linear-input
+downstream operator ``D^{(n)}`` by
 
 ```math
 D^{(e)}_{ij} =
@@ -84,11 +104,13 @@ D^{(n)}_{ij} =
 \end{cases}
 ```
 
-Thus a class-`0` input is absent from both downstream operators but remains in `W` and therefore in the upstream operator. It also remains part of `c_j` when class-`1` inputs are normalized.
+Class-``0`` inputs contribute to ``W`` and the upstream operator. The downstream
+operators use class-``2`` and class-``1`` inputs. Class-``0`` weights remain part
+of ``c_j`` when class-``1`` inputs are normalized.
 
 ## Supplier rationing factor
 
-Given `d^{(t)}`, define the current industry mass
+Given ``d^{(t)}``, define the current industry mass
 
 ```math
 M_k^{(t)} = \sum_{m:g(m)=k} r_m d_m^{(t)}.
@@ -107,7 +129,7 @@ The package defines the supplier rationing factor
 
 ## Downstream update
 
-For each customer `j` and industry `k`, define the essential shortage term
+For each customer ``j`` and industry ``k``, define the essential shortage term
 
 ```math
 S_{jk}^{(t)} =
@@ -118,7 +140,7 @@ D^{(e)}_{ij}
 \mathbf{1}_{g(i)=k}.
 ```
 
-Define the non-essential shortage term
+Define the linear-input shortage term
 
 ```math
 N_j^{(t)} =
@@ -164,7 +186,7 @@ It iterates the upstream and downstream recursions in lockstep until
 
 or until `maxiter` iterations have been reached.
 
-Define the final firm health `f_i` by
+Define the final firm health ``f_i`` by
 
 ```math
 f_i =
@@ -175,23 +197,29 @@ d_i, & \texttt{combine} = :\mathrm{downstream}.
 \end{cases}
 ```
 
-Let `w_i` be the final weights. The package default is `w_i = r_i`. The reported scalar is
+Let ``w_i`` be the final weights. The package default is ``w_i = r_i``. The
+reported scalar is
 
 ```math
 \mathrm{ESRI} =
 \frac{\sum_{i=1}^N w_i (1 - f_i)}{\sum_{i=1}^N w_i}.
 ```
 
-If `\sum_i w_i = 0`, the package returns the unnormalized numerator.
+For ``\sum_i w_i = 0``, the package returns ``0``.
 
-With the default `w_i = r_i`, this is a share of total output. With custom `final_weights`, it is a weighted average loss under those weights.
+With the default ``w_i = r_i``, this is a share of total output. With custom
+`final_weights`, it is a weighted average loss under those weights.
 
 ## Relation to the paper
 
-The package follows the same ESRI setup as Diem et al., Scientific Reports 12, 6214 (2022). We allow for general shock scenarios via `\psi`.
+The package follows the ESRI setup from Diem et al., Scientific Reports 12,
+7719 (2022). The package supports general shock scenarios through ``\psi``.
 
 For the submitted runtime comparison, see [Performance](performance.md).
 
 ## References
 
-Christian Diem, Andras Borsos, Tobias Reisch, Janos Kertesz, Stefan Thurner. Quantifying firm-level economic systemic risk from nation-wide supply networks. Scientific Reports 12, 6214, 2022. DOI `10.1038/s41598-022-11522-z`.
+Christian Diem, András Borsos, Tobias Reisch, János Kertész, Stefan Thurner.
+Quantifying firm-level economic systemic risk from nation-wide supply networks.
+Scientific Reports 12, 7719 (2022).
+[doi:10.1038/s41598-022-11522-z](https://doi.org/10.1038/s41598-022-11522-z).

@@ -4,7 +4,7 @@ using ESRIcascade
 DocMeta.setdocmeta!(
     ESRIcascade,
     :DocTestSetup,
-    :(using ESRIcascade, SparseArrays, LinearAlgebra, Random);
+    :(using ESRIcascade, SparseArrays, Statistics, Random);
     recursive = true,
 )
 
